@@ -129,10 +129,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\dynamix\Disassembler.cpp" />
+    <ClCompile Include="src\dynamix\ByteBlock.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\dynamix\Disassembler.h" />
+    <ClInclude Include="src\dynamix\ByteBlock.h" />
     <ClInclude Include="src\dynamix\dynamix.h" />
+    <ClInclude Include="src\dynamix\Value.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
