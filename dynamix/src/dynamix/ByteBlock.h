@@ -10,6 +10,7 @@ namespace dynamix {
 	enum class OpCode : uint8_t
 	{
 		Constant,
+		Pop,
 		Return,
 	};
 

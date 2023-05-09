@@ -29,8 +29,9 @@ namespace dynamix {
 
 		uint8_t instruction = block->bytes[offset];
 		switch ((OpCode)instruction) {
-			case OpCode::Return: return simple_instruction("OP_RETURN", offset);
 			case OpCode::Constant: return constant_instruction("OP_CONSTANT", block, offset);
+			case OpCode::Pop: return simple_instruction("OP_POP", offset);
+			case OpCode::Return: return simple_instruction("OP_RETURN", offset);
 			default:
 				printf("Unknown opcode %d\n", instruction);
 				return offset + 1;
