@@ -129,12 +129,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\dynamix\Compiler.cpp" />
     <ClCompile Include="src\dynamix\Disassembler.cpp" />
     <ClCompile Include="src\dynamix\ByteBlock.cpp" />
+    <ClCompile Include="src\dynamix\Lexer.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\dynamix\VirtualMachine.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\dynamix\Lexer.h" />
+    <ClInclude Include="src\dynamix\Compiler.h" />
     <ClInclude Include="src\dynamix\Disassembler.h" />
     <ClInclude Include="src\dynamix\ByteBlock.h" />
     <ClInclude Include="src\dynamix\dynamix.h" />
