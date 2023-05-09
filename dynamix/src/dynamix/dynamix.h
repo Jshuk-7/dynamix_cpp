@@ -22,6 +22,8 @@ namespace dynamix {
 		block.write_byte((uint8_t)OpCode::Constant, 124);
 		block.write_byte((uint8_t)constant2, 124);
 
+		block.write_byte((uint8_t)OpCode::Add, 124);
+
 		block.write_byte((uint8_t)OpCode::Return, 126);
 
 		VirtualMachine vm;

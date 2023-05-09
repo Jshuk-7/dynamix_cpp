@@ -20,7 +20,9 @@ namespace dynamix {
 		InterpretResult interpret(ByteBlock* block);
 		InterpretResult run();
 
+	private:
 		void reset_stack();
+		bool is_falsey(Value value);
 
 	private:
 		Stack<Value> m_Stack;

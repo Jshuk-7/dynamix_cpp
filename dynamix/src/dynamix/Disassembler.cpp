@@ -30,6 +30,12 @@ namespace dynamix {
 		uint8_t instruction = block->bytes[offset];
 		switch ((OpCode)instruction) {
 			case OpCode::Constant: return constant_instruction("OP_CONSTANT", block, offset);
+			case OpCode::Negate: return simple_instruction("OP_NEGATE", offset);
+			case OpCode::Not: return simple_instruction("OP_NOT", offset);
+			case OpCode::Add: return simple_instruction("OP_ADD", offset);
+			case OpCode::Sub: return simple_instruction("OP_SUB", offset);
+			case OpCode::Mul: return simple_instruction("OP_MUL", offset);
+			case OpCode::Div: return simple_instruction("OP_DIV", offset);
 			case OpCode::Pop: return simple_instruction("OP_POP", offset);
 			case OpCode::Return: return simple_instruction("OP_RETURN", offset);
 			default:
