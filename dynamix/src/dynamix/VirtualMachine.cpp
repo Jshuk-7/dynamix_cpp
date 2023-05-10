@@ -3,15 +3,26 @@
 #include "Disassembler.h"
 #include "dynamix.h"
 
-#include <cstdarg>
+#include <sstream>
+#include <iomanip>
 
 namespace dynamix {
 
 #define STACK_CAPACITY 256
+#define OBJECT_CAPACITY 256
 
 	VirtualMachine::VirtualMachine()
 	{
 		m_Stack.reserve(STACK_CAPACITY);
+		m_Objects.reserve(OBJECT_CAPACITY);
+	}
+
+	VirtualMachine::~VirtualMachine()
+	{
+		while (!m_Objects.is_empty()) {
+			Obj* object = m_Objects.pop();
+			delete object;
+		}
 	}
 
 	InterpretResult VirtualMachine::interpret(ByteBlock* block)
@@ -27,8 +38,8 @@ namespace dynamix {
 #define READ_BYTE() (*m_Ip++)
 #define READ_CONSTANT() (m_Block->constants[READ_BYTE()])
 #define TYPE_MISMATCH(lhs, rhs, op)\
-			auto lhs_type = value_type_to_string(lhs.type);\
-			auto rhs_type = value_type_to_string(rhs.type);\
+			auto lhs_type = value_type_to_string(lhs.type, lhs.is_object() ? &lhs.as.object->type : nullptr);\
+			auto rhs_type = value_type_to_string(rhs.type, rhs.is_object() ? &rhs.as.object->type : nullptr);\
 			runtime_error(std::format("operator '{}' not defined for types '{}' and '{}'", op, lhs_type, rhs_type))
 #define BINARY_OP(op, op_char)\
 			do {\
@@ -65,9 +76,15 @@ namespace dynamix {
 			Disassembler::disassemble_instruction(m_Block, (int32_t)(m_Ip - m_Block->bytes.data()));
 #endif
 
-			OpCode instruction;
-			switch (instruction = (OpCode)READ_BYTE()) {
-				case OpCode::Constant: m_Stack.push(READ_CONSTANT()); break;
+			switch (OpCode instruction = (OpCode)READ_BYTE()) {
+				case OpCode::Constant: {
+					Value constant = READ_CONSTANT();
+					if (constant.is_object()) {
+						m_Objects.push(constant.as.object);
+					}
+
+					m_Stack.push(constant);
+				} break;
 				case OpCode::Null: m_Stack.push(Value(nullptr)); break;
 				case OpCode::True: m_Stack.push(Value(true)); break;
 				case OpCode::False: m_Stack.push(Value(false)); break;
@@ -78,7 +95,20 @@ namespace dynamix {
 				} break;
 				case OpCode::Greater: BINARY_OP(>, '>'); break;
 				case OpCode::Less:    BINARY_OP(<, '<'); break;
-				case OpCode::Add:     BINARY_OP(+, '+'); break;
+				case OpCode::Add: {
+					if (peek(1).is_string()) {
+						concatenate();
+					}
+					else if (peek(1).is(ValueType::Number) && peek().is(ValueType::Number)) {
+						double b = m_Stack.pop().as.number;
+						double a = m_Stack.pop().as.number;
+						m_Stack.push(Value(a + b));
+					}
+					else {
+						TYPE_MISMATCH(peek(1), peek(), '+');
+						return InterpretResult::RuntimeError;
+					}
+				} break;
 				case OpCode::Sub:     BINARY_OP(-, '-'); break;
 				case OpCode::Mul:     BINARY_OP(*, '*'); break;
 				case OpCode::Div:     BINARY_OP(/, '/'); break;
@@ -127,11 +157,57 @@ namespace dynamix {
 			case ValueType::Bool:      return value.as.boolean == false;
 			case ValueType::Character: return value.as.character == '0';
 			case ValueType::Null:      return true;
+			case ValueType::Obj: {
+				switch (value.as.object->type)
+				{
+					case ObjType::String: return value.as_string()->obj.empty(); break;
+				}
+			}
 		}
 
 		// unreachable
 		__debugbreak();
 		return false;
+	}
+
+	void VirtualMachine::concatenate()
+	{
+		ObjString* result = new ObjString();
+		((Obj*)result)->type = ObjType::String;
+
+		if (peek().is_string()) {
+			ObjString* b = m_Stack.pop().as_string();
+			ObjString* a = m_Stack.pop().as_string();
+
+			std::string string = a->obj;
+			string += b->obj;
+
+			result->obj = string;
+		}
+		else if (peek().is(ValueType::Character)) {
+			char c = m_Stack.pop().as.character;
+			ObjString* lhs = m_Stack.pop().as_string();
+
+			std::string string = lhs->obj;
+			string += c + '\0';
+
+			result->obj = string;
+		}
+		else if (peek().is(ValueType::Number)) {
+			double n = m_Stack.pop().as.number;
+			ObjString* lhs = m_Stack.pop().as_string();
+
+			std::string string = lhs->obj;
+			string.pop_back();
+			std::stringstream ss;
+			ss << string << std::setw(1) << n << '\0';
+			string = ss.str();
+
+			result->obj = string;
+		}
+
+		m_Objects.push((Obj*)result);
+		m_Stack.push(Value((Obj*)result));
 	}
 
 	void VirtualMachine::runtime_error(const std::string& error)

@@ -109,7 +109,14 @@ namespace dynamix {
 	Token Lexer::character()
 	{
 		m_Start++;
+		advance();
+
 		Token token = make_token(TokenType::Char);
+
+		if (is_at_end() || peek() != '\'') {
+			return error_token("Unterminated character literal");
+		}
+
 		advance();
 		return token;
 	}

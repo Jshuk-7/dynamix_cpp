@@ -23,6 +23,7 @@ namespace dynamix {
 	{
 	public:
 		VirtualMachine();
+		~VirtualMachine();
 
 		InterpretResult interpret(ByteBlock* block);
 		InterpretResult run();
@@ -33,10 +34,12 @@ namespace dynamix {
 		Value peek(int32_t distance = 0) const;
 		void reset_stack();
 		bool is_falsey(Value value) const;
+		void concatenate();
 		void runtime_error(const std::string& error);
 
 	private:
 		Stack<Value> m_Stack;
+		Stack<Obj*> m_Objects;
 		ByteBlock* m_Block = nullptr;
 		uint8_t* m_Ip = nullptr;
 		RuntimeError m_LastError;

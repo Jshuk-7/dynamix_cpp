@@ -64,6 +64,7 @@ namespace dynamix {
 		void binary();
 		void literal();
 		void grouping();
+		void string();
 		void number();
 		void character();
 		void unary();

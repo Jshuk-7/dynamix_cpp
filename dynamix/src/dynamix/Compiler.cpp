@@ -32,7 +32,7 @@ namespace dynamix {
 			{ TokenType::Lt,        ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
 			{ TokenType::Lte,       ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
 			{ TokenType::Ident,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::String,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::String,    ParseRule{ BIND_FN(string),    nullptr,         Precedence::None}},
 			{ TokenType::Number,    ParseRule{ BIND_FN(number),    nullptr,         Precedence::None } },
 			{ TokenType::Char,      ParseRule{ BIND_FN(character), nullptr,         Precedence::None } },
 			{ TokenType::And,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
@@ -177,6 +177,18 @@ namespace dynamix {
 		consume(TokenType::RParen, "Expected ')' after expression");
 	}
 
+	void Compiler::string()
+	{
+		std::string string(m_Parser.previous.start + 1, m_Parser.previous.length - 2);
+		string.push_back('\0');
+		
+		ObjString* object = new ObjString();
+		((Obj*)object)->type = ObjType::String;
+		object->obj = string;
+
+		emit_constant(Value((Obj*)object));
+	}
+
 	void Compiler::number()
 	{
 		double number = strtod(m_Parser.previous.start, nullptr);
@@ -187,7 +199,6 @@ namespace dynamix {
 	{
 		char character = m_Parser.previous.start[0];
 		emit_constant(Value(character));
-		advance();
 	}
 
 	void Compiler::unary()
