@@ -68,6 +68,24 @@ namespace dynamix {
 				case ValueType::Null:      std::cout << "null" << func(); break;
 			}
 		}
+
+		bool operator==(const Value& other) const {
+			if (type != other.type) {
+				return false;
+			}
+
+			switch (type)
+			{
+				case dynamix::ValueType::Number:    return as.number == other.as.number;
+				case dynamix::ValueType::Bool:      return as.boolean == other.as.boolean;
+				case dynamix::ValueType::Character: return as.character == other.as.character;
+				case dynamix::ValueType::Null:      return true;
+			}
+
+			// unreachable
+			__debugbreak();
+			return false;
+		}
 	};
 
 

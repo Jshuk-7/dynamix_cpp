@@ -33,6 +33,9 @@ namespace dynamix {
 			case OpCode::Null:     return simple_instruction("OP_NULL", offset);
 			case OpCode::True:     return simple_instruction("OP_TRUE", offset);
 			case OpCode::False:    return simple_instruction("OP_FALSE", offset);
+			case OpCode::Equal:    return simple_instruction("OP_EQUAL", offset);
+			case OpCode::Greater:  return simple_instruction("OP_GREATER", offset);
+			case OpCode::Less:     return simple_instruction("OP_LESS", offset);
 			case OpCode::Add:      return simple_instruction("OP_ADD", offset);
 			case OpCode::Sub:      return simple_instruction("OP_SUB", offset);
 			case OpCode::Mul:      return simple_instruction("OP_MUL", offset);

@@ -32,13 +32,20 @@ namespace dynamix {
 			runtime_error(std::format("operator '{}' not defined for types '{}' and '{}'", op, lhs_type, rhs_type))
 #define BINARY_OP(op, op_char)\
 			do {\
-				if (!peek().is(ValueType::Number) || !peek(1).is(ValueType::Number)) {\
+				if (peek(1).type != peek().type) {\
 					TYPE_MISMATCH(peek(1), peek(), op_char);\
 					return InterpretResult::RuntimeError;\
 				}\
-				double b = m_Stack.pop().as.number;\
-				double a = m_Stack.pop().as.number;\
-				m_Stack.push(Value(a op b));\
+				switch (peek().type) {\
+					case ValueType::Number: {\
+						double b = m_Stack.pop().as.number;\
+						double a = m_Stack.pop().as.number;\
+						m_Stack.push(Value(a op b));\
+					} break;\
+					default:\
+						TYPE_MISMATCH(peek(1), peek(), op_char);\
+						return InterpretResult::RuntimeError;\
+				}\
 			} while (false)
 
 		for (;;) {
@@ -64,10 +71,17 @@ namespace dynamix {
 				case OpCode::Null: m_Stack.push(Value(nullptr)); break;
 				case OpCode::True: m_Stack.push(Value(true)); break;
 				case OpCode::False: m_Stack.push(Value(false)); break;
-				case OpCode::Add: BINARY_OP(+, '+'); break;
-				case OpCode::Sub: BINARY_OP(-, '-'); break;
-				case OpCode::Mul: BINARY_OP(*, '*'); break;
-				case OpCode::Div: BINARY_OP(/, '/'); break;
+				case OpCode::Equal: {
+					Value b = m_Stack.pop();
+					Value a = m_Stack.pop();
+					m_Stack.push(Value(a == b));
+				} break;
+				case OpCode::Greater: BINARY_OP(>, '>'); break;
+				case OpCode::Less:    BINARY_OP(<, '<'); break;
+				case OpCode::Add:     BINARY_OP(+, '+'); break;
+				case OpCode::Sub:     BINARY_OP(-, '-'); break;
+				case OpCode::Mul:     BINARY_OP(*, '*'); break;
+				case OpCode::Div:     BINARY_OP(/, '/'); break;
 				case OpCode::Negate: {
 					if (!peek(0).is(ValueType::Number)) {
 						runtime_error("operand must be a number");

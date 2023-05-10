@@ -23,14 +23,14 @@ namespace dynamix {
 			{ TokenType::Semicolon, ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Slash,     ParseRule{ nullptr,            BIND_FN(binary), Precedence::Factor } },
 			{ TokenType::Star,      ParseRule{ nullptr,            BIND_FN(binary), Precedence::Factor } },
-			{ TokenType::Bang,      ParseRule{ BIND_FN(unary),     nullptr,         Precedence::None}},
-			{ TokenType::BangEq,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Bang,      ParseRule{ BIND_FN(unary),     nullptr,         Precedence::None } },
+			{ TokenType::BangEq,    ParseRule{ nullptr,            BIND_FN(binary), Precedence::Equality } },
 			{ TokenType::Eq,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::EqEq,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::Gt,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::Gte,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::Lt,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::Lte,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::EqEq,      ParseRule{ nullptr,            BIND_FN(binary), Precedence::Equality } },
+			{ TokenType::Gt,        ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
+			{ TokenType::Gte,       ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
+			{ TokenType::Lt,        ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
+			{ TokenType::Lte,       ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
 			{ TokenType::Ident,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::String,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Number,    ParseRule{ BIND_FN(number),    nullptr,         Precedence::None } },
@@ -42,7 +42,7 @@ namespace dynamix {
 			{ TokenType::For,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Fun,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::If,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
-			{ TokenType::Null,      ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None}},
+			{ TokenType::Null,      ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None } },
 			{ TokenType::Or,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Print,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Return,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
@@ -143,11 +143,19 @@ namespace dynamix {
 		parse_precedence((Precedence)((uint32_t)rule.precedence + 1));
 
 		switch (operator_type) {
-			case TokenType::Plus:  emit_byte((uint8_t)OpCode::Add); break;
-			case TokenType::Minus: emit_byte((uint8_t)OpCode::Sub); break;
-			case TokenType::Star:  emit_byte((uint8_t)OpCode::Mul); break;
-			case TokenType::Slash: emit_byte((uint8_t)OpCode::Div); break;
-			default: return;
+			case TokenType::BangEq: emit_bytes((uint8_t)OpCode::Equal, (uint8_t)OpCode::Not);   break;
+			case TokenType::EqEq:   emit_byte((uint8_t)OpCode::Equal);                          break;
+			case TokenType::Gt:     emit_byte((uint8_t)OpCode::Greater);                        break;
+			case TokenType::Gte:    emit_bytes((uint8_t)OpCode::Less, (uint8_t)OpCode::Not);    break;
+			case TokenType::Lt:     emit_byte((uint8_t)OpCode::Less);                           break;
+			case TokenType::Lte:    emit_bytes((uint8_t)OpCode::Greater, (uint8_t)OpCode::Not); break;
+			case TokenType::Plus:   emit_byte((uint8_t)OpCode::Add);                            break;
+			case TokenType::Minus:  emit_byte((uint8_t)OpCode::Sub);                            break;
+			case TokenType::Star:   emit_byte((uint8_t)OpCode::Mul);                            break;
+			case TokenType::Slash:  emit_byte((uint8_t)OpCode::Div);                            break;
+			default:
+				// unreachable
+				return;
 		}
 	}
 
