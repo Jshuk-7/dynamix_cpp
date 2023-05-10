@@ -23,7 +23,7 @@ namespace dynamix {
 			{ TokenType::Semicolon, ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Slash,     ParseRule{ nullptr,            BIND_FN(binary), Precedence::Factor } },
 			{ TokenType::Star,      ParseRule{ nullptr,            BIND_FN(binary), Precedence::Factor } },
-			{ TokenType::Bang,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Bang,      ParseRule{ BIND_FN(unary),     nullptr,         Precedence::None}},
 			{ TokenType::BangEq,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Eq,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::EqEq,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
@@ -190,7 +190,10 @@ namespace dynamix {
 
 		switch (operator_type) {
 			case TokenType::Minus: emit_byte((uint8_t)OpCode::Negate); break;
-			default: return;
+			case TokenType::Bang:  emit_byte((uint8_t)OpCode::Not);    break;
+			default:
+				// unreachable
+				return;
 		}
 	}
 
