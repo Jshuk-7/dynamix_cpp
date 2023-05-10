@@ -36,6 +36,7 @@ namespace dynamix {
 		TokenType type;
 		const char* start;
 		uint32_t length;
+		uint32_t column;
 		uint32_t line;
 	};
 
@@ -52,6 +53,7 @@ namespace dynamix {
 		Token identifier();
 
 		void trim();
+		void next_line();
 		TokenType identifier_type() const;
 		char advance();
 		char peek() const;
@@ -70,6 +72,7 @@ namespace dynamix {
 		std::string m_Source;
 		const char* m_Current;
 		const char* m_Start;
+		const char* m_LineStart;
 		uint32_t m_Line;
 		std::unordered_map<std::string, TokenType> m_Keywords;
 	};

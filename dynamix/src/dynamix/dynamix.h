@@ -8,13 +8,15 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <filesystem>
 
 namespace dynamix {
 
+#define DEBUG_PRINT_CODE 1
 #define DEBUG_TRACE_EXECUTION 1
 
 	static void repl();
-	static InterpretResult run(const std::string& source);
+	static InterpretResult run(const std::string& filepath, const std::string& source);
 	static void run_file(const std::string& filepath);
 
 	static void runtime_start(int argc, char* argv[])
@@ -37,24 +39,26 @@ namespace dynamix {
 		std::string line;
 		for (;;) {
 			printf(">> ");
-			std::cin >> line;
+			std::getline(std::cin, line);
 
-			InterpretResult result = run(line);
+			InterpretResult result = run("stdin", line);
 
 			line.clear();
 		}
 	}
 
-	static InterpretResult run(const std::string& source)
+	static InterpretResult run(const std::string& filepath, const std::string& source)
 	{
-		Compiler compiler(source);
-		compiler.compile();
+		Compiler compiler(filepath, source);
+		
+		ByteBlock byte_code;
+		if (!compiler.compile(&byte_code)) {
+			std::cerr << compiler.get_last_error();
+			return InterpretResult::CompileError;
+		}
 
-		ByteBlock byte_code = compiler.byte_code();
-
-		return InterpretResult::Ok;
-		//VirtualMachine vm;
-		//return vm.interpret(&byte_code);
+		VirtualMachine vm;
+		return vm.interpret(&byte_code);
 	}
 
 	static void run_file(const std::string& filepath)
@@ -72,7 +76,7 @@ namespace dynamix {
 		source.resize(file_size);
 		file.read(source.data(), file_size);
 
-		run(source);
+		run(filepath, source);
 	}
 
 	static void print_value(Value value)

@@ -10,6 +10,7 @@ namespace dynamix {
 		m_Start(source.c_str()),
 		m_Current(source.c_str()),
 		m_Line(1),
+		m_LineStart(m_Current),
 		m_Keywords({
 			{ "&&",     TokenType::And    },
 			{ "struct", TokenType::Struct },
@@ -66,7 +67,7 @@ namespace dynamix {
 			case '"': return string();
 		}
 
-		std::string error = std::format("Unexpected character '{}'", m_Current);
+		std::string error = std::format("Unexpected character '{}'", m_Start);
 		return error_token(error.c_str());
 	}
 
@@ -74,10 +75,11 @@ namespace dynamix {
 	{
 		while (peek() != '"' && !is_at_end()) {
 			if (peek() == '\n') {
-				m_Line++;
+				next_line();
 			}
-
-			advance();
+			else {
+				advance();
+			}
 		}
 
 		if (is_at_end()) {
@@ -128,13 +130,19 @@ namespace dynamix {
 					}
 					else return;
 				case '\n':
-					m_Line++;
-					advance();
+					next_line();
 					break;
 				default:
 					return;
 			}
 		}
+	}
+
+	void Lexer::next_line()
+	{
+		m_Line++;
+		advance();
+		m_LineStart = &m_Current[-1];
 	}
 
 	TokenType Lexer::identifier_type() const
@@ -210,6 +218,7 @@ namespace dynamix {
 		token.type = type;
 		token.start = m_Start;
 		token.length = (uint32_t)(m_Current - m_Start);
+		token.column = (uint32_t)(m_Start - m_LineStart);
 		token.line = m_Line;
 		return token;
 	}
@@ -218,8 +227,16 @@ namespace dynamix {
 	{
 		Token token;
 		token.type = TokenType::Error;
-		token.start = err;
-		token.length = (uint32_t)strlen(err);
+		
+		size_t err_size = strlen(err);
+		char* error = (char*)malloc(err_size);
+		if (error) {
+			memcpy(error, err, err_size);
+		}
+
+		token.start = error;
+		token.length = (uint32_t)err_size;
+		token.column = (uint32_t)(m_Start - m_LineStart);
 		token.line = m_Line;
 		return token;
 	}
