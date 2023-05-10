@@ -21,10 +21,6 @@ namespace dynamix {
 			return back;
 		}
 
-		const T& pop() const {
-			return pop();
-		}
-
 		size_t size() const {
 			return m_Data.size();
 		}
@@ -59,6 +55,14 @@ namespace dynamix {
 
 		void reserve(size_t new_capacity) {
 			m_Data.reserve(new_capacity);
+		}
+
+		T& operator[](int32_t index) {
+			return m_Data[index];
+		}
+
+		const T& operator[](int32_t index) const {
+			return m_Data[index];
 		}
 
 	private:

@@ -62,8 +62,10 @@ namespace dynamix {
 		void emit_return();
 		
 		void binary();
+		void literal();
 		void grouping();
 		void number();
+		void character();
 		void unary();
 		void parse_precedence(Precedence precedence);
 		

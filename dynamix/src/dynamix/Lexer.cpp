@@ -65,6 +65,7 @@ namespace dynamix {
 			case '<': return make_token(match('=') ? TokenType::Lte : TokenType::Lt);
 			case '>': return make_token(match('=') ? TokenType::Gte : TokenType::Gt);
 			case '"': return string();
+			case '\'': return character();
 		}
 
 		std::string error = std::format("Unexpected character '{}'", m_Start);
@@ -103,6 +104,14 @@ namespace dynamix {
 		}
 
 		return make_token(TokenType::Number);
+	}
+
+	Token Lexer::character()
+	{
+		m_Start++;
+		Token token = make_token(TokenType::Char);
+		advance();
+		return token;
 	}
 
 	Token Lexer::identifier()

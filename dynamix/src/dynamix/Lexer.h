@@ -20,7 +20,7 @@ namespace dynamix {
 		Lt, Lte,
 
 		// Literals.
-		Ident, String, Number,
+		Ident, String, Number, Char,
 
 		// Keywords.
 		And, Struct, Else, False,
@@ -50,6 +50,7 @@ namespace dynamix {
 	private:
 		Token string();
 		Token number();
+		Token character();
 		Token identifier();
 
 		void trim();

@@ -30,14 +30,17 @@ namespace dynamix {
 		uint8_t instruction = block->bytes[offset];
 		switch ((OpCode)instruction) {
 			case OpCode::Constant: return constant_instruction("OP_CONSTANT", block, offset);
-			case OpCode::Negate: return simple_instruction("OP_NEGATE", offset);
-			case OpCode::Not: return simple_instruction("OP_NOT", offset);
-			case OpCode::Add: return simple_instruction("OP_ADD", offset);
-			case OpCode::Sub: return simple_instruction("OP_SUB", offset);
-			case OpCode::Mul: return simple_instruction("OP_MUL", offset);
-			case OpCode::Div: return simple_instruction("OP_DIV", offset);
-			case OpCode::Pop: return simple_instruction("OP_POP", offset);
-			case OpCode::Return: return simple_instruction("OP_RETURN", offset);
+			case OpCode::Null:     return simple_instruction("OP_NULL", offset);
+			case OpCode::True:     return simple_instruction("OP_TRUE", offset);
+			case OpCode::False:    return simple_instruction("OP_FALSE", offset);
+			case OpCode::Add:      return simple_instruction("OP_ADD", offset);
+			case OpCode::Sub:      return simple_instruction("OP_SUB", offset);
+			case OpCode::Mul:      return simple_instruction("OP_MUL", offset);
+			case OpCode::Div:      return simple_instruction("OP_DIV", offset);
+			case OpCode::Negate:   return simple_instruction("OP_NEGATE", offset);
+			case OpCode::Not:      return simple_instruction("OP_NOT", offset);
+			case OpCode::Pop:      return simple_instruction("OP_POP", offset);
+			case OpCode::Return:   return simple_instruction("OP_RETURN", offset);
 			default:
 				printf("Unknown opcode %d\n", instruction);
 				return offset + 1;
@@ -54,7 +57,7 @@ namespace dynamix {
 	{
 		uint8_t constant = block->bytes[(size_t)offset + 1];
 		printf("%-16s %4d '", name, constant);
-		print_value(block->constants[constant]);
+		block->constants[constant].print(false);
 		printf("'\n");
 		return offset + 2;
 	}

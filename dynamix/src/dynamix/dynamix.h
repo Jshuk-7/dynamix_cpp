@@ -36,14 +36,11 @@ namespace dynamix {
 
 	static void repl()
 	{
-		std::string line;
 		for (;;) {
 			printf(">> ");
+			std::string line;
 			std::getline(std::cin, line);
-
-			InterpretResult result = run("stdin", line);
-
-			line.clear();
+			run("stdin", line);
 		}
 	}
 
@@ -51,14 +48,34 @@ namespace dynamix {
 	{
 		Compiler compiler(filepath, source);
 		
-		ByteBlock byte_code;
+		std::string line;
+		std::vector<std::string> lines;
+		std::stringstream ss(source);
+		while (std::getline(ss, line, '\n'))
+			lines.push_back(line);
+
+		ByteBlock byte_code(lines);
 		if (!compiler.compile(&byte_code)) {
 			std::cerr << compiler.get_last_error();
 			return InterpretResult::CompileError;
 		}
 
 		VirtualMachine vm;
-		return vm.interpret(&byte_code);
+		if (vm.interpret(&byte_code) == InterpretResult::RuntimeError) {
+			const RuntimeError& error = vm.get_last_error();
+			std::cerr << std::format(
+				R"(thread 'main' panicked at: {}
+<{}:{}> Runtime Error: {}
+)",
+				error.source,
+				filepath,
+				error.line,
+				error.msg
+			);
+			return InterpretResult::RuntimeError;
+		}
+
+		return InterpretResult::Ok;
 	}
 
 	static void run_file(const std::string& filepath)
@@ -77,11 +94,6 @@ namespace dynamix {
 		file.read(source.data(), file_size);
 
 		run(filepath, source);
-	}
-
-	static void print_value(Value value)
-	{
-		printf("%g", value);
 	}
 
 }

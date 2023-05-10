@@ -12,46 +12,47 @@ namespace dynamix {
 	Compiler::Compiler(const std::string& filename, const std::string& source)
 		: m_Filename(filename), m_Lexer(source), m_Parser(), m_ParseRules(
 		{
-			{ TokenType::LParen,    ParseRule{ BIND_FN(grouping), nullptr,         Precedence::None } },
-			{ TokenType::RParen,    ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::LBracket,  ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::RBracket,  ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Comma,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Dot,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Minus,     ParseRule{ BIND_FN(unary),    BIND_FN(binary), Precedence::Term } },
-			{ TokenType::Plus,      ParseRule{ nullptr,           BIND_FN(binary), Precedence::Term } },
-			{ TokenType::Semicolon, ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Slash,     ParseRule{ nullptr,           BIND_FN(binary), Precedence::Factor } },
-			{ TokenType::Star,      ParseRule{ nullptr,           BIND_FN(binary), Precedence::Factor } },
-			{ TokenType::Bang,      ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::BangEq,    ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Eq,        ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::EqEq,      ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Gt,        ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Gte,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Lt,        ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Lte,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Ident,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::String,    ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Number,    ParseRule{ BIND_FN(number),   nullptr,         Precedence::None}},
-			{ TokenType::And,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Struct,    ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Else,      ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::False,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::For,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Fun,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::If,        ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Null,      ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Or,        ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Print,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Return,    ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Super,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Self,      ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::True,      ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Let,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::While,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Error,     ParseRule{ nullptr,           nullptr,         Precedence::None } },
-			{ TokenType::Eof,       ParseRule{ nullptr,           nullptr,         Precedence::None } },
+			{ TokenType::LParen,    ParseRule{ BIND_FN(grouping),  nullptr,         Precedence::None } },
+			{ TokenType::RParen,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::LBracket,  ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::RBracket,  ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Comma,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Dot,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Minus,     ParseRule{ BIND_FN(unary),     BIND_FN(binary), Precedence::Term } },
+			{ TokenType::Plus,      ParseRule{ nullptr,            BIND_FN(binary), Precedence::Term } },
+			{ TokenType::Semicolon, ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Slash,     ParseRule{ nullptr,            BIND_FN(binary), Precedence::Factor } },
+			{ TokenType::Star,      ParseRule{ nullptr,            BIND_FN(binary), Precedence::Factor } },
+			{ TokenType::Bang,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::BangEq,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Eq,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::EqEq,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Gt,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Gte,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Lt,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Lte,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Ident,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::String,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Number,    ParseRule{ BIND_FN(number),    nullptr,         Precedence::None } },
+			{ TokenType::Char,      ParseRule{ BIND_FN(character), nullptr,         Precedence::None } },
+			{ TokenType::And,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Struct,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Else,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::False,     ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None } },
+			{ TokenType::For,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Fun,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::If,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Null,      ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None}},
+			{ TokenType::Or,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Print,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Return,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Super,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Self,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::True,      ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None } },
+			{ TokenType::Let,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::While,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Error,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Eof,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
 		}
 	) { }
 
@@ -62,11 +63,12 @@ namespace dynamix {
 		expression();
 		consume(TokenType::Eof, "Expected end of expression");
 		emit_return();
-		ByteBlock block = current_byte_block();
 
 #if DEBUG_PRINT_CODE
-		if (!m_Parser.had_error)
+		if (!m_Parser.had_error) {
+			ByteBlock block = current_byte_block();
 			Disassembler::disassemble_block(&block, "code");
+		}
 #endif
 
 		return !m_Parser.had_error;
@@ -84,9 +86,8 @@ namespace dynamix {
 		for (;;) {
 			m_Parser.current = m_Lexer.scan_token();
 
-			if (m_Parser.current.type != TokenType::Error) {
+			if (m_Parser.current.type != TokenType::Error)
 				break;
-			}
 
 			std::string err(m_Parser.current.start, (size_t)m_Parser.current.length);
 			err.push_back('\0');
@@ -150,6 +151,18 @@ namespace dynamix {
 		}
 	}
 
+	void Compiler::literal()
+	{
+		switch (m_Parser.previous.type) {
+			case TokenType::Null:  emit_byte((uint8_t)OpCode::Null);  break;
+			case TokenType::True:  emit_byte((uint8_t)OpCode::True);  break;
+			case TokenType::False: emit_byte((uint8_t)OpCode::False); break;
+			default:
+				// unreachable
+				return;
+		}
+	}
+
 	void Compiler::grouping()
 	{
 		expression();
@@ -158,8 +171,15 @@ namespace dynamix {
 
 	void Compiler::number()
 	{
-		double value = strtod(m_Parser.previous.start, nullptr);
-		emit_constant(value);
+		double number = strtod(m_Parser.previous.start, nullptr);
+		emit_constant(Value(number));
+	}
+
+	void Compiler::character()
+	{
+		char character = m_Parser.previous.start[0];
+		emit_constant(Value(character));
+		advance();
 	}
 
 	void Compiler::unary()
