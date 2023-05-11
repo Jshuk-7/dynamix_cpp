@@ -1,10 +1,13 @@
 #include "Compiler.h"
 
+#include "dynamix.h"
 #include "Disassembler.h"
 
 #include <format>
 
 namespace dynamix {
+
+#define LOCAL_CAPACITY 256
 
 	using namespace std::placeholders;
 #define BIND_FN(fn) [this](auto&&... args) -> decltype(auto) { return this->fn(std::forward<decltype(args)>(args)...); }
@@ -54,7 +57,11 @@ namespace dynamix {
 			{ TokenType::Error,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Eof,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
 		}
-	) { }
+	)
+	{
+		m_Locals.reserve(LOCAL_CAPACITY);
+		m_ScopeDepth = 0;
+	}
 
 	bool Compiler::compile(ByteBlock* byte_code)
 	{
@@ -68,7 +75,7 @@ namespace dynamix {
 		consume(TokenType::Eof, "Expected end of expression");
 		push_return();
 
-#if DEBUG_PRINT_CODE
+#if DEBUG_DISASSEMBLE_CODE
 		if (!m_Parser.had_error) {
 			ByteBlock block = current_byte_block();
 			Disassembler::disassemble_block(&block, "code");
@@ -109,6 +116,15 @@ namespace dynamix {
 		parse_precedence(Precedence::Assign);
 	}
 
+	void Compiler::block()
+	{
+		while (!check(TokenType::RBracket) && !check(TokenType::Eof)) {
+			declaration();
+		}
+
+		consume(TokenType::RBracket, "Expected '}' after block");
+	}
+
 	void Compiler::expression_statement()
 	{
 		expression();
@@ -130,6 +146,11 @@ namespace dynamix {
 		}
 		else if (match(TokenType::Print)) {
 			print_statement();
+		}
+		else if (match(TokenType::LBracket)) {
+			begin_scope();
+			block();
+			end_scope();
 		}
 		else {
 			expression_statement();
@@ -229,7 +250,7 @@ namespace dynamix {
 		push_byte((uint8_t)OpCode::Return);
 	}
 
-	void Compiler::binary()
+	void Compiler::binary(bool can_assign)
 	{
 		TokenType operator_type = m_Parser.previous.type;
 		ParseRule rule = m_ParseRules.at(operator_type);
@@ -252,7 +273,7 @@ namespace dynamix {
 		}
 	}
 
-	void Compiler::literal()
+	void Compiler::literal(bool can_assign)
 	{
 		switch (m_Parser.previous.type) {
 			case TokenType::Null:  push_byte((uint8_t)OpCode::Null);  break;
@@ -264,24 +285,43 @@ namespace dynamix {
 		}
 	}
 
-	void Compiler::grouping()
+	void Compiler::grouping(bool can_assign)
 	{
 		expression();
 		consume(TokenType::RParen, "Expected ')' after expression");
 	}
 
-	void Compiler::named_variable(Token* name)
+	void Compiler::named_variable(const Token* name, bool can_assign)
 	{
-		uint8_t constant = identifier_constant(name);
-		push_bytes((uint8_t)OpCode::GetGlobal, constant);
+		uint8_t get_op;
+		uint8_t set_op;
+
+		int32_t constant = resolve_local(name);
+		if (constant != -1) {
+			get_op = (uint8_t)OpCode::GetLocal;
+			set_op = (uint8_t)OpCode::SetLocal;
+		}
+		else {
+			constant = (int32_t)identifier_constant(name);
+			get_op = (uint8_t)OpCode::GetGlobal;
+			set_op = (uint8_t)OpCode::SetGlobal;
+		}
+
+		if (can_assign && match(TokenType::Eq)) {
+			expression();
+			push_bytes(set_op, (uint8_t)constant);
+		}
+		else {
+			push_bytes(get_op, (uint8_t)constant);
+		}
 	}
 
-	void Compiler::variable()
+	void Compiler::variable(bool can_assign)
 	{
-		named_variable(&m_Parser.previous);
+		named_variable(&m_Parser.previous, can_assign);
 	}
 
-	void Compiler::string()
+	void Compiler::string(bool can_assign)
 	{
 		std::string string(m_Parser.previous.start + 1, m_Parser.previous.length - 2);
 		string.push_back('\0');
@@ -293,19 +333,19 @@ namespace dynamix {
 		push_constant(Value((Obj*)object));
 	}
 
-	void Compiler::number()
+	void Compiler::number(bool can_assign)
 	{
 		double number = strtod(m_Parser.previous.start, nullptr);
 		push_constant(Value(number));
 	}
 
-	void Compiler::character()
+	void Compiler::character(bool can_assign)
 	{
 		char character = m_Parser.previous.start[0];
 		push_constant(Value(character));
 	}
 
-	void Compiler::unary()
+	void Compiler::unary(bool can_assign)
 	{
 		TokenType operator_type = m_Parser.previous.type;
 
@@ -320,6 +360,21 @@ namespace dynamix {
 		}
 	}
 
+	void Compiler::begin_scope()
+	{
+		m_ScopeDepth++;
+	}
+
+	void Compiler::end_scope()
+	{
+		m_ScopeDepth--;
+
+		while (!m_Locals.is_empty() && m_Locals[m_Locals.size() - 1].depth > m_ScopeDepth) {
+			push_byte((uint8_t)OpCode::Pop);
+			m_Locals.pop();
+		}
+	}
+
 	void Compiler::parse_precedence(Precedence precedence)
 	{
 		advance();
@@ -329,16 +384,21 @@ namespace dynamix {
 			return;
 		}
 
-		prefix_rule();
+		bool can_assign = precedence <= Precedence::Assign;
+		prefix_rule(can_assign);
 
 		while (precedence <= m_ParseRules.at(m_Parser.current.type).precedence) {
 			advance();
 			ParseFn infix_rule = m_ParseRules.at(m_Parser.previous.type).infix;
-			infix_rule();
+			infix_rule(can_assign);
+		}
+
+		if (can_assign && match(TokenType::Eq)) {
+			error("Invalid assignment target");
 		}
 	}
 
-	uint8_t Compiler::identifier_constant(Token* name)
+	uint8_t Compiler::identifier_constant(const Token* name)
 	{
 		ObjString* object = new ObjString();
 		((Obj*)object)->type = ObjType::String;
@@ -350,14 +410,99 @@ namespace dynamix {
 		return make_constant(Value((Obj*)object));
 	}
 
+	bool Compiler::identifiers_equal(const Token* name, const Token* other) const
+	{
+		if (name->length != other->length) {
+			return false;
+		}
+
+		return memcmp(name->start, other->start, name->length) == 0;
+	}
+
+	int32_t Compiler::resolve_local(const Token* name)
+	{
+		for (int32_t i = m_Locals.size() - 1; i >= 0; i--) {
+			const Local* local = &m_Locals[(size_t)i];
+			if (identifiers_equal(name, &local->name)) {
+				if (local->depth == -1) {
+					std::string var_name(local->name.start, local->name.length);
+					if (var_name.find('\0') == std::string::npos) {
+						var_name.push_back('\0');
+					}
+
+					error(std::format("uninitialized local variable '{}' used", var_name));
+				}
+
+				return (int32_t)i;
+			}
+		}
+
+		return -1;
+	}
+
+	void Compiler::add_local(const Token* name)
+	{
+		if (m_Locals.size() == LOCAL_CAPACITY) {
+			error("Too many local variables in function");
+			return;
+		}
+
+		Local local;
+		local.name = *name;
+		local.depth = -1;
+		m_Locals.push(local);
+	}
+
+	void Compiler::declare_variable()
+	{
+		if (m_ScopeDepth == 0) {
+			return;
+		}
+
+		Token* name = &m_Parser.previous;
+		for (int32_t i = m_Locals.size() - 1; i >= 0; i--) {
+			Local* local = &m_Locals[(size_t)i];
+			if (local->depth != -1 && local->depth < (int32_t)m_ScopeDepth) {
+				break;
+			}
+
+			if (identifiers_equal(name, &local->name)) {
+				std::string var_name(name->start, name->length);
+				if (var_name.find('\0') == std::string::npos) {
+					var_name.push_back('\0');
+				}
+
+				error(std::format("variable '{}' has multiple definitions; multiple initialization", var_name));
+			}
+		}
+
+		add_local(name);
+	}
+
 	uint8_t Compiler::parse_variable(const std::string& error)
 	{
 		consume(TokenType::Ident, error);
+
+		declare_variable();
+		if (m_ScopeDepth > 0) {
+			return 0;
+		}
+
 		return identifier_constant(&m_Parser.previous);
+	}
+
+	void Compiler::mark_initialized()
+	{
+		m_Locals[m_Locals.size() - 1].depth = m_ScopeDepth;
 	}
 
 	void Compiler::define_variable(uint8_t global)
 	{
+		if (m_ScopeDepth > 0) {
+			mark_initialized();
+			return;
+		}
+
 		push_bytes((uint8_t)OpCode::DefineGlobal, global);
 	}
 
@@ -379,10 +524,10 @@ namespace dynamix {
 
 	void Compiler::error(const std::string& msg)
 	{
-		error_at(m_Parser.previous, msg);
+		error_at(&m_Parser.previous, msg);
 	}
 
-	void Compiler::error_at(Token token, const std::string& msg)
+	void Compiler::error_at(const Token* token, const std::string& msg)
 	{
 		if (m_Parser.panic_mode) {
 			return;
@@ -390,20 +535,20 @@ namespace dynamix {
 
 		m_Parser.panic_mode = true;
 		std::string error;
-		error += std::format("<{}:{}:{}> Compiler Error", m_Filename, token.column, token.line);
+		error += std::format("<{}:{}:{}> Compiler Error", m_Filename, token->column, token->line);
 
-		if (token.type == TokenType::Eof) {
+		if (token->type == TokenType::Eof) {
 			error += " at end";
 		}
-		else if (token.type == TokenType::Error) {
+		else if (token->type == TokenType::Error) {
 			// Nothing
 		}
 		else {
 			const char* format = " at '%.*s'";
-			size_t buf_size = token.length + strlen(format);
+			size_t buf_size = token->length + strlen(format);
 			char* buf = (char*)malloc(buf_size);
 			if (buf) {
-				sprintf_s(buf, buf_size, format, token.length, token.start);
+				sprintf_s(buf, buf_size, format, token->length, token->start);
 				error.append(buf);
 			}
 			free(buf);
@@ -416,7 +561,7 @@ namespace dynamix {
 
 	void Compiler::error_at_current(const std::string& msg)
 	{
-		error_at(m_Parser.current, msg);
+		error_at(&m_Parser.current, msg);
 	}
 
 }

@@ -3,6 +3,7 @@
 #include "ByteBlock.h"
 #include "Lexer.h"
 #include "Value.h"
+#include "Stack.h"
 
 #include <unordered_map>
 #include <functional>
@@ -25,13 +26,19 @@ namespace dynamix {
 		Atom
 	};
 
-	using ParseFn = std::function<void()>;
+	using ParseFn = std::function<void(bool)>;
 
 	struct ParseRule
 	{
 		ParseFn prefix;
 		ParseFn infix;
 		Precedence precedence;
+	};
+
+	struct Local
+	{
+		Token name;
+		int32_t depth;
 	};
 
 	struct Parser
@@ -55,6 +62,7 @@ namespace dynamix {
 		Token advance();
 		
 		void expression();
+		void block();
 		void expression_statement();
 		void print_statement();
 		void declaration();
@@ -71,35 +79,48 @@ namespace dynamix {
 		void push_constant(Value value);
 		void push_return();
 		
-		void binary();
-		void literal();
-		void grouping();
-		void named_variable(Token* name);
-		void variable();
-		void string();
-		void number();
-		void character();
-		void unary();
+		void binary(bool can_assign);
+		void literal(bool can_assign);
+		void grouping(bool can_assign);
+		void named_variable(const Token* name, bool can_assign);
+		void variable(bool can_assign);
+		void string(bool can_assign);
+		void number(bool can_assign);
+		void character(bool can_assign);
+		void unary(bool can_assign);
 		
+		void begin_scope();
+		void end_scope();
+
 		void parse_precedence(Precedence precedence);
-		uint8_t identifier_constant(Token* name);
+		uint8_t identifier_constant(const Token* name);
+		bool identifiers_equal(const Token* name, const Token* other) const;
+		int32_t resolve_local(const Token* name);
+		void add_local(const Token* name);
+		void declare_variable();
 		uint8_t parse_variable(const std::string& error);
+		void mark_initialized();
 		void define_variable(uint8_t global);
 
 		uint8_t make_constant(Value value);
 
 		ByteBlock& current_byte_block();
 		void error(const std::string& msg);
-		void error_at(Token token, const std::string& msg);
+		void error_at(const Token* token, const std::string& msg);
 		void error_at_current(const std::string& msg);
 
 	private:
-		std::unordered_map<TokenType, ParseRule> m_ParseRules;
 		std::string m_Filename;
 		std::string m_LastError;
+		
 		ByteBlock* m_ByteBlock = nullptr;
 		Lexer m_Lexer;
 		Parser m_Parser;
+
+		std::unordered_map<TokenType, ParseRule> m_ParseRules;
+
+		Stack<Local> m_Locals;
+		uint32_t m_ScopeDepth;
 	};
 
 }

@@ -1,2 +1,31 @@
-let a = 10;
-print(a + 20);
+
+let a = 1;
+print(a);
+
+{
+	let a = "Hello, World!";
+	print(a);
+}
+
+print(a);
+
+{
+	let a = false;
+	print(a);
+}
+
+print(a);
+
+{
+	let a = 'x';
+	print(a);
+}
+
+print(a);
+
+{
+	let a = null;
+	print(a);
+}
+
+print(a);

@@ -13,6 +13,7 @@ namespace dynamix {
 		Ok,
 		CompileError,
 		RuntimeError,
+		FailedToOpenFile,
 	};
 
 	struct RuntimeError
@@ -39,6 +40,7 @@ namespace dynamix {
 		bool is_falsey(Value value) const;
 		void concatenate(bool& failed);
 		void remove_null_terminator(std::string& str);
+		void stack_trace();
 		void runtime_error(const std::string& error);
 
 	private:

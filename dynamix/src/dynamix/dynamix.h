@@ -12,13 +12,13 @@
 
 namespace dynamix {
 
-#define DEBUG_PRINT_CODE 1
-#define DEBUG_TRACE_EXECUTION 1
+#define DEBUG_STACK_TRACE 0
+#define DEBUG_DISASSEMBLE_CODE 0
 
 	static void repl();
-	static void run(const std::string& filepath, const std::string& source);
-	static void run(VirtualMachine& vm, const std::string& filepath, const std::string& source);
-	static void run_file(const std::string& filepath);
+	static InterpretResult run(const std::string& filepath, const std::string& source);
+	static InterpretResult run(VirtualMachine& vm, const std::string& filepath, const std::string& source);
+	static InterpretResult run_file(const std::string& filepath);
 
 	static void runtime_start(int argc, char* argv[])
 	{
@@ -47,7 +47,7 @@ namespace dynamix {
 		}
 	}
 
-	static void run(VirtualMachine& vm, const std::string& filepath, const std::string& source)
+	static InterpretResult run(VirtualMachine& vm, const std::string& filepath, const std::string& source)
 	{
 		Compiler compiler(filepath, source);
 		
@@ -60,34 +60,36 @@ namespace dynamix {
 		ByteBlock byte_code(lines);
 		if (!compiler.compile(&byte_code)) {
 			std::cerr << compiler.get_last_error();
-			return;
+			return InterpretResult::CompileError;
 		}
 
 		if (vm.interpret(&byte_code) == InterpretResult::RuntimeError) {
 			const RuntimeError& error = vm.get_last_error();
 			std::cerr << std::format(
-				"thread 'main' panicked at: {}\n<{}:{}> Runtime Error: {}",
+				"thread 'main' panicked at: {}\n<{}:{}> Runtime Error: {}\n",
 				error.source,
 				filepath,
 				error.line,
 				error.msg
 			);
-			return;
+			return InterpretResult::RuntimeError;
 		}
+
+		return InterpretResult::Ok;
 	}
 
-	static void run(const std::string& filepath, const std::string& source)
+	static InterpretResult run(const std::string& filepath, const std::string& source)
 	{
 		VirtualMachine vm;
-		run(vm, filepath, source);
+		return run(vm, filepath, source);
 	}
 
-	static void run_file(const std::string& filepath)
+	static InterpretResult run_file(const std::string& filepath)
 	{
 		std::ifstream file(filepath);
 		if (!file.is_open()) {
 			std::cerr << "Failed to open file '/" << filepath << "'\n";
-			return;
+			return InterpretResult::FailedToOpenFile;
 		}
 
 		file.seekg(0, std::ios::end);
@@ -97,7 +99,12 @@ namespace dynamix {
 		source.resize(file_size);
 		file.read(source.data(), file_size);
 
-		run(filepath, source);
+		InterpretResult result = run(filepath, source);
+		if (result == InterpretResult::Ok) {
+			printf("program exited successfully...");
+		}
+
+		return result;
 	}
 
 }

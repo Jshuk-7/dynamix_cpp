@@ -11,7 +11,7 @@ namespace dynamix {
 	{
 		std::cout << std::format("-- {} --\n", name);
 
-		for (uint32_t offset = 0; offset < block->bytes.size();) {
+		for (int32_t offset = 0; offset < block->bytes.size();) {
 			offset = disassemble_instruction(block, offset);
 		}
 	}
@@ -46,6 +46,8 @@ namespace dynamix {
 			case OpCode::DefineGlobal: return constant_instruction("DEFINE GLOBAL", block, offset);
 			case OpCode::GetGlobal:    return constant_instruction("GET GLOBAL", block, offset);
 			case OpCode::SetGlobal:    return constant_instruction("SET GLOBAL", block, offset);
+			case OpCode::GetLocal:     return byte_instruction("GET LOCAL", block, offset);
+			case OpCode::SetLocal:     return byte_instruction("SET LOCAL", block, offset);
 			case OpCode::Print:        return simple_instruction("PRINT", offset);
 			case OpCode::Return:       return simple_instruction("RETURN", offset);
 			default:
@@ -66,6 +68,13 @@ namespace dynamix {
 		printf("OPCODE: %-16s %4d '", name, constant);
 		block->constants[constant].print(false);
 		printf("'\n");
+		return offset + 2;
+	}
+
+	int32_t Disassembler::byte_instruction(const char* name, ByteBlock* block, int32_t offset)
+	{
+		uint8_t slot = block->bytes[offset + 1];
+		printf("OPCODE: %-16s %4d\n", name, slot);
 		return offset + 2;
 	}
 

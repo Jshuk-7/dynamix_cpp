@@ -62,11 +62,11 @@ namespace dynamix {
 			m_Data.reserve(new_capacity);
 		}
 
-		T& operator[](int32_t index) {
+		T& operator[](size_t index) {
 			return m_Data[index];
 		}
 
-		const T& operator[](int32_t index) const {
+		const T& operator[](size_t index) const {
 			return m_Data[index];
 		}
 

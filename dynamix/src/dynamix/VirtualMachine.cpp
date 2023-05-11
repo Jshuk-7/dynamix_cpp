@@ -1,7 +1,7 @@
 #include "VirtualMachine.h"
 
-#include "Disassembler.h"
 #include "dynamix.h"
+#include "Disassembler.h"
 
 #include <sstream>
 #include <iomanip>
@@ -20,7 +20,7 @@ namespace dynamix {
 	VirtualMachine::~VirtualMachine()
 	{
 		const size_t obj_count = m_Objects.size();
-		for (uint32_t i = 0; i < obj_count; i++) {
+		for (size_t i = 0; i < obj_count; i++) {
 			Maybe<Obj*> value = m_Objects.pop();
 			if (!value.is_some()) {
 				continue;
@@ -65,21 +65,12 @@ namespace dynamix {
 				}\
 			} while (false)
 
+#if DEBUG_STACK_TRACE
+		printf("-- stack trace --");
+#endif
 		for (;;) {
-#if DEBUG_TRACE_EXECUTION
-			printf("          ");
-			if (!m_Stack.is_empty()) {
-				uint32_t i = 0;
-				while (i < m_Stack.size()) {
-					Value* slot = m_Stack.first() + (i++);
-					printf("[ ");
-					(*slot).print(false);
-					printf(" ]");
-				}
-			}
-			printf("\n");
-
-			Disassembler::disassemble_instruction(m_Block, (int32_t)(m_Ip - m_Block->bytes.data()));
+#if DEBUG_STACK_TRACE
+			stack_trace();
 #endif
 
 			switch (OpCode instruction = (OpCode)READ_BYTE()) {
@@ -154,7 +145,22 @@ namespace dynamix {
 					m_Stack.push(value);
 				} break;
 				case OpCode::SetGlobal: {
-					
+					ObjString* name = READ_CONSTANT().as_string();
+					if (!m_Globals.contains(name->obj)) {
+						std::string err = std::format("Undefined variable '{}'", name->obj);
+						runtime_error(err);
+						return InterpretResult::RuntimeError;
+					}
+
+					m_Globals[name->obj] = peek();
+				} break;
+				case OpCode::GetLocal: {
+					uint8_t slot = READ_BYTE();
+					m_Stack.push(m_Stack[(size_t)slot]);
+				} break;
+				case OpCode::SetLocal: {
+					uint8_t slot = READ_BYTE();
+					m_Stack[slot] = peek();
 				} break;
 				case OpCode::Print: m_Stack.pop().data().print(true); break;
 				case OpCode::Return: return InterpretResult::Ok;
@@ -176,7 +182,7 @@ namespace dynamix {
 
 	Value VirtualMachine::peek(int32_t distance) const
 	{
-		return m_Stack[(int32_t)m_Stack.size() - 1 - distance];
+		return m_Stack[m_Stack.size() - 1 - distance];
 	}
 
 	void VirtualMachine::reset_stack()
@@ -258,6 +264,22 @@ namespace dynamix {
 
 			str.erase(pos);
 		}
+	}
+
+	void VirtualMachine::stack_trace()
+	{
+		printf("          ");
+		
+		for (size_t i = 0; i < m_Stack.size(); i++) {
+			const Value& slot = m_Stack[i];
+			printf("[ ");
+			slot.print(false);
+			printf(" ]");
+		}
+
+		printf("\n");
+
+		Disassembler::disassemble_instruction(m_Block, (int32_t)(m_Ip - m_Block->bytes.data()));
 	}
 
 	void VirtualMachine::runtime_error(const std::string& error)
