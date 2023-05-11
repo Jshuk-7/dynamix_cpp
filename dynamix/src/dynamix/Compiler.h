@@ -53,9 +53,16 @@ namespace dynamix {
 
 	private:
 		Token advance();
-		void expression();
-		void consume(TokenType expected, const std::string& msg);
 		
+		void expression();
+		void expression_statement();
+		void print_statement();
+		void declaration();
+		
+		void consume(TokenType expected, const std::string& msg);
+		bool match(TokenType type);
+		bool check(TokenType type);
+
 		void emit_byte(uint8_t byte);
 		void emit_bytes(uint8_t one, uint8_t two);
 		void emit_constant(Value value);

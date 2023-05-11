@@ -19,9 +19,15 @@ namespace dynamix {
 
 	VirtualMachine::~VirtualMachine()
 	{
-		while (!m_Objects.is_empty()) {
-			Obj* object = m_Objects.pop();
-			delete object;
+		const size_t obj_count = m_Objects.size();
+		for (uint32_t i = 0; i < obj_count; i++) {
+			Maybe<Obj*> value = m_Objects.pop();
+			if (!value.is_some()) {
+				continue;
+			}
+
+			Obj* obj = value.data();
+			delete obj;
 		}
 	}
 
@@ -49,8 +55,8 @@ namespace dynamix {
 				}\
 				switch (peek().type) {\
 					case ValueType::Number: {\
-						double b = m_Stack.pop().as.number;\
-						double a = m_Stack.pop().as.number;\
+						double b = m_Stack.pop().data().as.number;\
+						double a = m_Stack.pop().data().as.number;\
 						m_Stack.push(Value(a op b));\
 					} break;\
 					default:\
@@ -89,8 +95,8 @@ namespace dynamix {
 				case OpCode::True: m_Stack.push(Value(true)); break;
 				case OpCode::False: m_Stack.push(Value(false)); break;
 				case OpCode::Equal: {
-					Value b = m_Stack.pop();
-					Value a = m_Stack.pop();
+					Value b = m_Stack.pop().data();
+					Value a = m_Stack.pop().data();
 					m_Stack.push(Value(a == b));
 				} break;
 				case OpCode::Greater: BINARY_OP(>, '>'); break;
@@ -100,8 +106,8 @@ namespace dynamix {
 						concatenate();
 					}
 					else if (peek(1).is(ValueType::Number) && peek().is(ValueType::Number)) {
-						double b = m_Stack.pop().as.number;
-						double a = m_Stack.pop().as.number;
+						double b = m_Stack.pop().data().as.number;
+						double a = m_Stack.pop().data().as.number;
 						m_Stack.push(Value(a + b));
 					}
 					else {
@@ -118,14 +124,12 @@ namespace dynamix {
 						return InterpretResult::RuntimeError;
 					}
 
-					m_Stack.push(Value(-m_Stack.pop().as.number));
+					m_Stack.push(Value(-m_Stack.pop().data().as.number));
 				} break;
-				case OpCode::Not: m_Stack.push(Value(is_falsey(m_Stack.pop()))); break;
+				case OpCode::Not: m_Stack.push(Value(is_falsey(m_Stack.pop().data()))); break;
+				case OpCode::Print: m_Stack.pop().data().print(true); break;
 				case OpCode::Pop: m_Stack.pop(); break;
-				case OpCode::Return: {
-					m_Stack.pop().print(true);
-					return InterpretResult::Ok;
-				}
+				case OpCode::Return: return InterpretResult::Ok;
 			}
 		}
 
@@ -176,8 +180,8 @@ namespace dynamix {
 		((Obj*)result)->type = ObjType::String;
 
 		if (peek().is_string()) {
-			ObjString* b = m_Stack.pop().as_string();
-			ObjString* a = m_Stack.pop().as_string();
+			ObjString* b = m_Stack.pop().data().as_string();
+			ObjString* a = m_Stack.pop().data().as_string();
 
 			std::string string = a->obj;
 			string += b->obj;
@@ -185,8 +189,8 @@ namespace dynamix {
 			result->obj = string;
 		}
 		else if (peek().is(ValueType::Character)) {
-			char c = m_Stack.pop().as.character;
-			ObjString* lhs = m_Stack.pop().as_string();
+			char c = m_Stack.pop().data().as.character;
+			ObjString* lhs = m_Stack.pop().data().as_string();
 
 			std::string string = lhs->obj;
 			string += c + '\0';
@@ -194,8 +198,8 @@ namespace dynamix {
 			result->obj = string;
 		}
 		else if (peek().is(ValueType::Number)) {
-			double n = m_Stack.pop().as.number;
-			ObjString* lhs = m_Stack.pop().as_string();
+			double n = m_Stack.pop().data().as.number;
+			ObjString* lhs = m_Stack.pop().data().as_string();
 
 			std::string string = lhs->obj;
 			string.pop_back();

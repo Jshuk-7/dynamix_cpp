@@ -22,6 +22,7 @@ namespace dynamix {
 		Mul,
 		Negate,
 		Not,
+		Print,
 		Pop,
 		Return,
 	};

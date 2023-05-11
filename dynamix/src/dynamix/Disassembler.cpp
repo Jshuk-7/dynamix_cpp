@@ -42,6 +42,7 @@ namespace dynamix {
 			case OpCode::Div:      return simple_instruction("OP_DIV", offset);
 			case OpCode::Negate:   return simple_instruction("OP_NEGATE", offset);
 			case OpCode::Not:      return simple_instruction("OP_NOT", offset);
+			case OpCode::Print:    return simple_instruction("OP_PRINT", offset);
 			case OpCode::Pop:      return simple_instruction("OP_POP", offset);
 			case OpCode::Return:   return simple_instruction("OP_RETURN", offset);
 			default:

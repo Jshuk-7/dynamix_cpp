@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Maybe.h"
+
 #include <vector>
 
 namespace dynamix {
@@ -15,10 +17,13 @@ namespace dynamix {
 			m_Data.push_back(value);
 		}
 
-		T& pop() {
+		Maybe<T> pop() {
+			if (is_empty()) {
+				return Maybe<T>(false);
+			}
 			T& back = m_Data.back();
 			m_Data.pop_back();
-			return back;
+			return Maybe<T>(true, &back);
 		}
 
 		size_t size() const {

@@ -142,6 +142,7 @@
     <ClInclude Include="src\dynamix\Disassembler.h" />
     <ClInclude Include="src\dynamix\ByteBlock.h" />
     <ClInclude Include="src\dynamix\dynamix.h" />
+    <ClInclude Include="src\dynamix\Maybe.h" />
     <ClInclude Include="src\dynamix\Object.h" />
     <ClInclude Include="src\dynamix\Value.h" />
     <ClInclude Include="src\dynamix\VirtualMachine.h" />

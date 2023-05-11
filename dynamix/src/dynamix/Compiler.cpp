@@ -60,7 +60,11 @@ namespace dynamix {
 	{
 		m_ByteBlock = byte_code;
 		advance();
-		expression();
+		
+		while (!match(TokenType::Eof)) {
+			declaration();
+		}
+
 		consume(TokenType::Eof, "Expected end of expression");
 		emit_return();
 
@@ -105,14 +109,53 @@ namespace dynamix {
 		parse_precedence(Precedence::Assign);
 	}
 
+	void Compiler::expression_statement()
+	{
+		expression();
+		consume(TokenType::Semicolon, "Expected ';' after expression");
+		emit_byte((uint8_t)OpCode::Pop);
+	}
+
+	void Compiler::print_statement()
+	{
+		expression();
+		consume(TokenType::Semicolon, "Expected ';' after expression");
+		emit_byte((uint8_t)OpCode::Print);
+	}
+
+	void Compiler::declaration()
+	{
+		if (match(TokenType::Print)) {
+			print_statement();
+		}
+		else {
+			expression_statement();
+		}
+	}
+
 	void Compiler::consume(TokenType expected, const std::string& msg)
 	{
-		if (m_Parser.current.type == expected) {
-			advance();
+		if (!check(expected)) {
+			error_at_current(msg);
 			return;
 		}
 
-		error_at_current(msg);
+		advance();
+	}
+
+	bool Compiler::match(TokenType type)
+	{
+		if (!check(type)) {
+			return false;
+		}
+
+		advance();
+		return true;
+	}
+
+	bool Compiler::check(TokenType type)
+	{
+		return m_Parser.current.type == type;
 	}
 
 	void Compiler::emit_byte(uint8_t byte)
