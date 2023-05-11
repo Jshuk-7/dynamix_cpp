@@ -134,6 +134,10 @@ namespace dynamix {
 					uint16_t offset = READ_SHORT();
 					m_Ip += offset;
 				} break;
+				case OpCode::Loop: {
+					uint16_t offset = READ_SHORT();
+					m_Ip -= offset;
+				} break;
 				case OpCode::Jz: {
 					uint16_t offset = READ_SHORT();
 
@@ -143,6 +147,14 @@ namespace dynamix {
 				} break;
 				case OpCode::DefineGlobal: {
 					ObjString* name = READ_STRING();
+					if (m_Globals.contains(name->obj)) {
+						runtime_error(std::format(
+							"global variable '{}' has multiple definitions; multiple initialization",
+							name->obj
+						));
+						return InterpretResult::RuntimeError;
+					}
+
 					m_Globals[name->obj] = peek();
 					m_Stack.pop();
 				} break;
@@ -179,7 +191,10 @@ namespace dynamix {
 				case OpCode::Return: return InterpretResult::Ok;
 				default: {
 					size_t opcode = m_Ip - m_Block->bytes.data() - 1;
-					runtime_error(std::format("OpCode '{}' not implemented in virtual machine", opcode));
+					runtime_error(std::format(
+						"OpCode '{}' not implemented in virtual machine",
+						opcode
+					));
 					return InterpretResult::RuntimeError;
 				}
 			}

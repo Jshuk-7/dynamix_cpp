@@ -140,7 +140,15 @@ namespace dynamix {
 				case ValueType::Obj: {
 					switch (as.object->type)
 					{
-						case ObjType::String: return as_string()->obj == other.as_string()->obj; break;
+						case ObjType::String: {
+							std::string lhs = as_string()->obj;
+							std::string rhs = other.as_string()->obj;
+							if (lhs.size() != rhs.size()) {
+								return false;
+							}
+
+							return memcmp(lhs.data(), rhs.data(), lhs.size()) == 0;
+						}
 					}
 				}
 			}

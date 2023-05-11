@@ -213,13 +213,14 @@ namespace dynamix {
 
 	bool Lexer::is_digit(char c) const
 	{
-		return c >= '0' && c <= '9' || c == '_';
+		return (c >= '0' && c <= '9')
+			|| std::string("_'").find(c) != std::string::npos;
 	}
 
 	bool Lexer::is_alpha(char c) const
 	{
-		return c >= 'a' && c <= 'z'
-			|| c >= 'A' && c <= 'Z'
+		return (c >= 'a' && c <= 'z')
+			|| (c >= 'A' && c <= 'Z')
 			|| std::string("_&|").find(c) != std::string::npos;
 	}
 

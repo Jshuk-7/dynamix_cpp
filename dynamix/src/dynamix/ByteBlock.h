@@ -25,6 +25,7 @@ namespace dynamix {
 		Not,
 		Jmp,
 		Jz,
+		Loop,
 		DefineGlobal,
 		GetGlobal,
 		SetGlobal,

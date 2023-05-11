@@ -1,6 +1,0 @@
-let msg = "My Message";
-let msg = "Hello";
-
-{
-	print(msg);
-}

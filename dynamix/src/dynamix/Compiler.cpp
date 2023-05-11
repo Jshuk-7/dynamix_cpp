@@ -38,7 +38,7 @@ namespace dynamix {
 			{ TokenType::String,    ParseRule{ BIND_FN(string),    nullptr,         Precedence::None}},
 			{ TokenType::Number,    ParseRule{ BIND_FN(number),    nullptr,         Precedence::None } },
 			{ TokenType::Char,      ParseRule{ BIND_FN(character), nullptr,         Precedence::None } },
-			{ TokenType::And,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::And,       ParseRule{ nullptr,            BIND_FN(and_),   Precedence::And } },
 			{ TokenType::Struct,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Else,      ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::False,     ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None } },
@@ -46,7 +46,7 @@ namespace dynamix {
 			{ TokenType::Fun,       ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::If,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Null,      ParseRule{ BIND_FN(literal),   nullptr,         Precedence::None } },
-			{ TokenType::Or,        ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Or,        ParseRule{ nullptr,            BIND_FN(or_),    Precedence::Or } },
 			{ TokenType::Print,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Return,    ParseRule{ nullptr,            nullptr,         Precedence::None } },
 			{ TokenType::Super,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
@@ -199,10 +199,77 @@ namespace dynamix {
 
 	void Compiler::while_statement()
 	{
+		int32_t loop_start = current_byte_block().bytes.size();
+		expression();
+
+		int32_t exit_jump = push_jump((uint8_t)OpCode::Jz);
+		push_byte((uint8_t)OpCode::Pop);
+		if (match(TokenType::LBracket)) {
+			begin_scope();
+			block();
+			end_scope();
+		}
+		else {
+			statement();
+		}
+
+		push_loop(loop_start);
+
+		patch_jump(exit_jump);
+		push_byte((uint8_t)OpCode::Pop);
 	}
 
 	void Compiler::for_statement()
 	{
+		begin_scope();
+		consume(TokenType::LParen, "expected '(' after for");
+		if (match(TokenType::Semicolon)) {
+			// nothing
+		}
+		else if (match(TokenType::Let)) {
+			let_declaration();
+		}
+		else {
+			expression_statement();
+		}
+
+		int32_t loop_start = current_byte_block().bytes.size();
+		int32_t exit_jump = -1;
+		if (!match(TokenType::Semicolon)) {
+			expression();
+			consume(TokenType::Semicolon, "expected ';' after loop condition");
+
+			exit_jump = push_jump((uint8_t)OpCode::Jz);
+			push_byte((uint8_t)OpCode::Pop);
+		}
+
+		if (!match(TokenType::RParen)) {
+			int32_t body_jump = push_jump((uint8_t)OpCode::Jmp);
+			int32_t increment_start = current_byte_block().bytes.size();
+			expression();
+			push_byte((uint8_t)OpCode::Pop);
+			consume(TokenType::RParen, "expected ')'");
+
+			push_loop(loop_start);
+			loop_start = increment_start;
+			patch_jump(body_jump);
+		}
+
+		if (match(TokenType::LBracket)) {
+			block();
+		}
+		else {
+			statement();
+		}
+
+		push_loop(loop_start);
+		
+		if (exit_jump != -1) {
+			patch_jump(exit_jump);
+			push_byte((uint8_t)OpCode::Pop);
+		}
+
+		end_scope();
 	}
 
 	void Compiler::declaration()
@@ -296,6 +363,19 @@ namespace dynamix {
 	{
 		push_byte(one);
 		push_byte(two);
+	}
+
+	void Compiler::push_loop(int32_t loop_start)
+	{
+		push_byte((uint8_t)OpCode::Loop);
+
+		int32_t offset = current_byte_block().bytes.size() - loop_start + 2;
+		if (offset > UINT16_MAX) {
+			error("Loop body too large");
+		}
+
+		push_byte((offset >> 8) & 0xff);
+		push_byte(offset & 0xff);
 	}
 
 	int32_t Compiler::push_jump(uint8_t instruction)
@@ -414,7 +494,12 @@ namespace dynamix {
 
 	void Compiler::number(bool can_assign)
 	{
-		double number = strtod(m_Parser.previous.start, nullptr);
+		std::string number_string(m_Parser.previous.start, m_Parser.previous.length);
+		remove_char_from_string(number_string, '_');
+		remove_char_from_string(number_string, '\'');
+		number_string.push_back('\0');
+
+		double number = std::strtod(number_string.c_str(), nullptr);
 		push_constant(Value(number));
 	}
 
@@ -437,6 +522,28 @@ namespace dynamix {
 				// unreachable
 				return;
 		}
+	}
+
+	void Compiler::and_(bool can_assign)
+	{
+		int32_t end_jump = push_jump((uint8_t)OpCode::Jz);
+		push_byte((uint8_t)OpCode::Pop);
+
+		parse_precedence(Precedence::And);
+
+		patch_jump(end_jump);
+	}
+
+	void Compiler::or_(bool can_assign)
+	{
+		int32_t else_jump = push_jump((uint8_t)OpCode::Jz);
+		int32_t end_jump = push_jump((uint8_t)OpCode::Jmp);
+
+		patch_jump(else_jump);
+		push_byte((uint8_t)OpCode::Pop);
+
+		parse_precedence(Precedence::Or);
+		patch_jump(end_jump);
 	}
 
 	void Compiler::begin_scope()
@@ -590,6 +697,17 @@ namespace dynamix {
 		}
 
 		return (uint8_t)constant;
+	}
+
+	void Compiler::remove_char_from_string(std::string& str, char c) const
+	{
+		while (size_t pos = str.find(c)) {
+			if (pos == std::string::npos) {
+				return;
+			}
+
+			str.replace(pos, 1, "");
+		}
 	}
 
 	ByteBlock& Compiler::current_byte_block()

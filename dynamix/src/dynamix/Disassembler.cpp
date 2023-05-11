@@ -45,6 +45,7 @@ namespace dynamix {
 			case OpCode::Not:          return simple_instruction("NOT", offset);
 			case OpCode::Jmp:          return jump_instruction("JZ", 1, block, offset);
 			case OpCode::Jz:           return jump_instruction("JMP", 1, block, offset);
+			case OpCode::Loop:         return jump_instruction("LOOP", -1, block, offset);
 			case OpCode::DefineGlobal: return constant_instruction("DEFINE GLOBAL", block, offset);
 			case OpCode::GetGlobal:    return constant_instruction("GET GLOBAL", block, offset);
 			case OpCode::SetGlobal:    return constant_instruction("SET GLOBAL", block, offset);

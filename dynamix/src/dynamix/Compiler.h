@@ -80,6 +80,7 @@ namespace dynamix {
 
 		void push_byte(uint8_t byte);
 		void push_bytes(uint8_t one, uint8_t two);
+		void push_loop(int32_t loop_start);
 		int32_t push_jump(uint8_t instruction);
 		void push_constant(Value value);
 		void push_return();
@@ -95,6 +96,8 @@ namespace dynamix {
 		void number(bool can_assign);
 		void character(bool can_assign);
 		void unary(bool can_assign);
+		void and_(bool can_assign);
+		void or_(bool can_assign);
 		
 		void begin_scope();
 		void end_scope();
@@ -110,6 +113,7 @@ namespace dynamix {
 		void define_variable(uint8_t global);
 
 		uint8_t make_constant(Value value);
+		void remove_char_from_string(std::string& str, char c) const;
 
 		ByteBlock& current_byte_block();
 		void error(const std::string& msg);
