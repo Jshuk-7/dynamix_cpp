@@ -72,7 +72,7 @@ namespace dynamix {
 			declaration();
 		}
 
-		consume(TokenType::Eof, "Expected end of expression");
+		consume(TokenType::Eof, "expected end of expression");
 		push_return();
 
 #if DEBUG_DISASSEMBLE_CODE
@@ -122,29 +122,12 @@ namespace dynamix {
 			declaration();
 		}
 
-		consume(TokenType::RBracket, "Expected '}' after block");
+		consume(TokenType::RBracket, "expected '}' after block");
 	}
 
-	void Compiler::expression_statement()
+	void Compiler::statement()
 	{
-		expression();
-		consume(TokenType::Semicolon, "Expected ';' after expression");
-		push_byte((uint8_t)OpCode::Pop);
-	}
-
-	void Compiler::print_statement()
-	{
-		expression();
-		consume(TokenType::Semicolon, "Expected ';' after expression");
-		push_byte((uint8_t)OpCode::Print);
-	}
-
-	void Compiler::declaration()
-	{
-		if (match(TokenType::Let)) {
-			let_declaration();
-		}
-		else if (match(TokenType::Print)) {
+		if (match(TokenType::Print)) {
 			print_statement();
 		}
 		else if (match(TokenType::LBracket)) {
@@ -152,8 +135,83 @@ namespace dynamix {
 			block();
 			end_scope();
 		}
+		else if (match(TokenType::If)) {
+			if_statement();
+		}
+		else if (match(TokenType::While)) {
+			while_statement();
+		}
+		else if (match(TokenType::For)) {
+			for_statement();
+		}
 		else {
 			expression_statement();
+		}
+	}
+
+	void Compiler::expression_statement()
+	{
+		expression();
+		consume(TokenType::Semicolon, "expected ';' after expression");
+		push_byte((uint8_t)OpCode::Pop);
+	}
+
+	void Compiler::print_statement()
+	{
+		expression();
+		consume(TokenType::Semicolon, "expected ';' after expression");
+		push_byte((uint8_t)OpCode::Print);
+	}
+
+	void Compiler::if_statement()
+	{
+		expression();
+
+		int32_t then_jump = push_jump((uint8_t)OpCode::Jz);
+		push_byte((uint8_t)OpCode::Pop);
+		if (match(TokenType::LBracket)) {
+			begin_scope();
+			block();
+			end_scope();
+		}
+		else {
+			statement();
+		}
+
+		int32_t else_jump = push_jump((uint8_t)OpCode::Jmp);
+
+		patch_jump(then_jump);
+		push_byte((uint8_t)OpCode::Pop);
+
+		if (match(TokenType::Else)) {
+			if (match(TokenType::LBracket)) {
+				begin_scope();
+				block();
+				end_scope();
+			}
+			else {
+				statement();
+			}
+		}
+
+		patch_jump(else_jump);
+	}
+
+	void Compiler::while_statement()
+	{
+	}
+
+	void Compiler::for_statement()
+	{
+	}
+
+	void Compiler::declaration()
+	{
+		if (match(TokenType::Let)) {
+			let_declaration();
+		}
+		else {
+			statement();
 		}
 
 		if (m_Parser.panic_mode) {
@@ -163,7 +221,7 @@ namespace dynamix {
 
 	void Compiler::let_declaration()
 	{
-		uint8_t global = parse_variable("Expected identifier");
+		uint8_t global = parse_variable("expected identifier");
 
 		if (match(TokenType::Eq)) {
 			expression();
@@ -172,7 +230,7 @@ namespace dynamix {
 			push_byte((uint8_t)OpCode::Null);
 		}
 
-		consume(TokenType::Semicolon, "Expected ';' after expression");
+		consume(TokenType::Semicolon, "expected ';' after expression");
 
 		define_variable(global);
 	}
@@ -240,6 +298,14 @@ namespace dynamix {
 		push_byte(two);
 	}
 
+	int32_t Compiler::push_jump(uint8_t instruction)
+	{
+		push_byte(instruction);
+		push_byte(0xff);
+		push_byte(0xff);
+		return (int32_t)current_byte_block().bytes.size() - 2;
+	}
+
 	void Compiler::push_constant(Value value)
 	{
 		push_bytes((uint8_t)OpCode::PushConstant, make_constant(value));
@@ -248,6 +314,18 @@ namespace dynamix {
 	void Compiler::push_return()
 	{
 		push_byte((uint8_t)OpCode::Return);
+	}
+
+	void Compiler::patch_jump(int32_t offset)
+	{
+		int32_t jump = (int32_t)current_byte_block().bytes.size() - offset - 2;
+
+		if (jump > UINT16_MAX) {
+			error("Too much code to jump over");
+		}
+
+		current_byte_block().bytes[offset] = (jump >> 8) & 0xff;
+		current_byte_block().bytes[offset + 1] = jump & 0xff;
 	}
 
 	void Compiler::binary(bool can_assign)
@@ -288,7 +366,7 @@ namespace dynamix {
 	void Compiler::grouping(bool can_assign)
 	{
 		expression();
-		consume(TokenType::RParen, "Expected ')' after expression");
+		consume(TokenType::RParen, "expected ')' after expression");
 	}
 
 	void Compiler::named_variable(const Token* name, bool can_assign)
@@ -327,8 +405,9 @@ namespace dynamix {
 		string.push_back('\0');
 		
 		ObjString* object = new ObjString();
+		object->obj.resize(string.size());
+		object->obj.assign(string);
 		((Obj*)object)->type = ObjType::String;
-		object->obj = string;
 
 		push_constant(Value((Obj*)object));
 	}
@@ -380,7 +459,7 @@ namespace dynamix {
 		advance();
 		ParseFn prefix_rule = m_ParseRules.at(m_Parser.previous.type).prefix;
 		if (!prefix_rule) {
-			error("Expected expression");
+			error("expected expression");
 			return;
 		}
 
@@ -394,7 +473,7 @@ namespace dynamix {
 		}
 
 		if (can_assign && match(TokenType::Eq)) {
-			error("Invalid assignment target");
+			error("invalid assignment target");
 		}
 	}
 
@@ -426,9 +505,7 @@ namespace dynamix {
 			if (identifiers_equal(name, &local->name)) {
 				if (local->depth == -1) {
 					std::string var_name(local->name.start, local->name.length);
-					if (var_name.find('\0') == std::string::npos) {
-						var_name.push_back('\0');
-					}
+					var_name.push_back('\0');
 
 					error(std::format("uninitialized local variable '{}' used", var_name));
 				}
@@ -443,7 +520,7 @@ namespace dynamix {
 	void Compiler::add_local(const Token* name)
 	{
 		if (m_Locals.size() == LOCAL_CAPACITY) {
-			error("Too many local variables in function");
+			error("too many local variables in function");
 			return;
 		}
 
@@ -468,9 +545,7 @@ namespace dynamix {
 
 			if (identifiers_equal(name, &local->name)) {
 				std::string var_name(name->start, name->length);
-				if (var_name.find('\0') == std::string::npos) {
-					var_name.push_back('\0');
-				}
+				var_name.push_back('\0');
 
 				error(std::format("variable '{}' has multiple definitions; multiple initialization", var_name));
 			}
@@ -510,7 +585,7 @@ namespace dynamix {
 	{
 		int32_t constant = current_byte_block().add_constant(value);
 		if (constant > UINT8_MAX) {
-			error("Too many constants in one block");
+			error("too many constants in one block");
 			return 0;
 		}
 
@@ -535,7 +610,7 @@ namespace dynamix {
 
 		m_Parser.panic_mode = true;
 		std::string error;
-		error += std::format("<{}:{}:{}> Compiler Error", m_Filename, token->column, token->line);
+		error += std::format("<{}:{}:{}> Compiler Error", m_Filename, token->line, token->column);
 
 		if (token->type == TokenType::Eof) {
 			error += " at end";

@@ -63,8 +63,12 @@ namespace dynamix {
 		
 		void expression();
 		void block();
+		void statement();
 		void expression_statement();
 		void print_statement();
+		void if_statement();
+		void while_statement();
+		void for_statement();
 		void declaration();
 		void let_declaration();
 
@@ -76,8 +80,11 @@ namespace dynamix {
 
 		void push_byte(uint8_t byte);
 		void push_bytes(uint8_t one, uint8_t two);
+		int32_t push_jump(uint8_t instruction);
 		void push_constant(Value value);
 		void push_return();
+
+		void patch_jump(int32_t offset);
 		
 		void binary(bool can_assign);
 		void literal(bool can_assign);

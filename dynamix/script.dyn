@@ -1,31 +1,6 @@
-
-let a = 1;
-print(a);
-
-{
-	let a = "Hello, World!";
-	print(a);
-}
-
-print(a);
+let msg = "My Message";
+let msg = "Hello";
 
 {
-	let a = false;
-	print(a);
+	print(msg);
 }
-
-print(a);
-
-{
-	let a = 'x';
-	print(a);
-}
-
-print(a);
-
-{
-	let a = null;
-	print(a);
-}
-
-print(a);

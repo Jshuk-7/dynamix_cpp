@@ -13,6 +13,7 @@ namespace dynamix {
 		static int32_t simple_instruction(const char* name, int32_t offset);
 		static int32_t constant_instruction(const char* name, ByteBlock* block, int32_t offset);
 		static int32_t byte_instruction(const char* name, ByteBlock* block, int32_t offset);
+		static int32_t jump_instruction(const char* name, int32_t sign, ByteBlock* block, int32_t offset);
 	};
 
 }

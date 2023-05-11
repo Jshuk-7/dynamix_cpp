@@ -42,7 +42,9 @@ namespace dynamix {
 	InterpretResult VirtualMachine::run()
 	{
 #define READ_BYTE() (*m_Ip++)
+#define READ_SHORT() (m_Ip += 2, (uint16_t)((m_Ip[-2] << 8) | m_Ip[-1]))
 #define READ_CONSTANT() (m_Block->constants[READ_BYTE()])
+#define READ_STRING() (READ_CONSTANT().as_string())
 #define TYPE_MISMATCH(lhs, rhs, op)\
 			auto lhs_type = value_type_to_string(lhs.type, lhs.is_object() ? &lhs.as.object->type : nullptr);\
 			auto rhs_type = value_type_to_string(rhs.type, rhs.is_object() ? &rhs.as.object->type : nullptr);\
@@ -128,15 +130,26 @@ namespace dynamix {
 					m_Stack.push(Value(-m_Stack.pop().data().as.number));
 				} break;
 				case OpCode::Not: m_Stack.push(Value(is_falsey(m_Stack.pop().data()))); break;
+				case OpCode::Jmp: {
+					uint16_t offset = READ_SHORT();
+					m_Ip += offset;
+				} break;
+				case OpCode::Jz: {
+					uint16_t offset = READ_SHORT();
+
+					if (is_falsey(peek())) {
+						m_Ip += offset;
+					}
+				} break;
 				case OpCode::DefineGlobal: {
-					ObjString* name = READ_CONSTANT().as_string();
+					ObjString* name = READ_STRING();
 					m_Globals[name->obj] = peek();
 					m_Stack.pop();
 				} break;
 				case OpCode::GetGlobal: {
-					ObjString* name = READ_CONSTANT().as_string();
+					ObjString* name = READ_STRING();
 					if (!m_Globals.contains(name->obj)) {
-						std::string err = std::format("Undefined variable '{}'", name->obj);
+						std::string err = std::format("undefined variable '{}'", name->obj);
 						runtime_error(err);
 						return InterpretResult::RuntimeError;
 					}
@@ -145,9 +158,9 @@ namespace dynamix {
 					m_Stack.push(value);
 				} break;
 				case OpCode::SetGlobal: {
-					ObjString* name = READ_CONSTANT().as_string();
+					ObjString* name = READ_STRING();
 					if (!m_Globals.contains(name->obj)) {
-						std::string err = std::format("Undefined variable '{}'", name->obj);
+						std::string err = std::format("undefined variable '{}'", name->obj);
 						runtime_error(err);
 						return InterpretResult::RuntimeError;
 					}
@@ -164,14 +177,19 @@ namespace dynamix {
 				} break;
 				case OpCode::Print: m_Stack.pop().data().print(true); break;
 				case OpCode::Return: return InterpretResult::Ok;
-				default:
-					runtime_error("OpCode not implemented in virtual machine");
+				default: {
+					size_t opcode = m_Ip - m_Block->bytes.data() - 1;
+					runtime_error(std::format("OpCode '{}' not implemented in virtual machine", opcode));
+					return InterpretResult::RuntimeError;
+				}
 			}
 		}
 
-#undef TYPE_MISMATCH
 #undef BINARY_OP
+#undef TYPE_MISMATCH
+#undef READ_STRING
 #undef READ_CONSTANT
+#undef READ_SHORT
 #undef READ_BYTE
 	}
 
@@ -213,7 +231,6 @@ namespace dynamix {
 	void VirtualMachine::concatenate(bool& failed)
 	{
 		ObjString* result = new ObjString();
-		((Obj*)result)->type = ObjType::String;
 
 		if (peek().is_string()) {
 			ObjString* rhs = m_Stack.pop().data().as_string();
@@ -250,6 +267,8 @@ namespace dynamix {
 		else {
 			failed = true;
 		}
+
+		((Obj*)result)->type = ObjType::String;
 
 		m_Objects.push((Obj*)result);
 		m_Stack.push(Value((Obj*)result));

@@ -23,6 +23,8 @@ namespace dynamix {
 		Mul,
 		Negate,
 		Not,
+		Jmp,
+		Jz,
 		DefineGlobal,
 		GetGlobal,
 		SetGlobal,

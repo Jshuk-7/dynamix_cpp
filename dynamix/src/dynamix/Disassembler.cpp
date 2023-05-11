@@ -43,6 +43,8 @@ namespace dynamix {
 			case OpCode::Div:          return simple_instruction("DIV", offset);
 			case OpCode::Negate:       return simple_instruction("NEGATE", offset);
 			case OpCode::Not:          return simple_instruction("NOT", offset);
+			case OpCode::Jmp:          return jump_instruction("JZ", 1, block, offset);
+			case OpCode::Jz:           return jump_instruction("JMP", 1, block, offset);
 			case OpCode::DefineGlobal: return constant_instruction("DEFINE GLOBAL", block, offset);
 			case OpCode::GetGlobal:    return constant_instruction("GET GLOBAL", block, offset);
 			case OpCode::SetGlobal:    return constant_instruction("SET GLOBAL", block, offset);
@@ -76,6 +78,14 @@ namespace dynamix {
 		uint8_t slot = block->bytes[offset + 1];
 		printf("OPCODE: %-16s %4d\n", name, slot);
 		return offset + 2;
+	}
+
+	int32_t Disassembler::jump_instruction(const char* name, int32_t sign, ByteBlock* block, int32_t offset)
+	{
+		uint16_t jump = (uint16_t)(block->bytes[offset + 1] << 8);
+		jump |= block->bytes[offset + 2];
+		printf("OPCODE: %-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+		return offset + 3;
 	}
 
 }

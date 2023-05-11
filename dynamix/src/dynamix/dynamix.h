@@ -20,6 +20,8 @@ namespace dynamix {
 	static InterpretResult run(VirtualMachine& vm, const std::string& filepath, const std::string& source);
 	static InterpretResult run_file(const std::string& filepath);
 
+	static bool is_repl_mode = false;
+
 	static void runtime_start(int argc, char* argv[])
 	{
 		if (argc == 1) {
@@ -37,6 +39,7 @@ namespace dynamix {
 
 	static void repl()
 	{
+		is_repl_mode = true;
 		VirtualMachine vm;
 
 		for (;;) {
@@ -59,7 +62,9 @@ namespace dynamix {
 
 		ByteBlock byte_code(lines);
 		if (!compiler.compile(&byte_code)) {
-			std::cerr << compiler.get_last_error();
+			std::cerr << (!is_repl_mode ? std::format("failed to compile program '{}'\n", filepath) : "")
+				<< compiler.get_last_error();
+
 			return InterpretResult::CompileError;
 		}
 
