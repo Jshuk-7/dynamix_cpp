@@ -16,7 +16,8 @@ namespace dynamix {
 #define DEBUG_TRACE_EXECUTION 1
 
 	static void repl();
-	static InterpretResult run(const std::string& filepath, const std::string& source);
+	static void run(const std::string& filepath, const std::string& source);
+	static void run(VirtualMachine& vm, const std::string& filepath, const std::string& source);
 	static void run_file(const std::string& filepath);
 
 	static void runtime_start(int argc, char* argv[])
@@ -36,15 +37,17 @@ namespace dynamix {
 
 	static void repl()
 	{
+		VirtualMachine vm;
+
 		for (;;) {
 			printf(">> ");
 			std::string line;
 			std::getline(std::cin, line);
-			run("stdin", line);
+			run(vm, "stdin", line);
 		}
 	}
 
-	static InterpretResult run(const std::string& filepath, const std::string& source)
+	static void run(VirtualMachine& vm, const std::string& filepath, const std::string& source)
 	{
 		Compiler compiler(filepath, source);
 		
@@ -57,25 +60,26 @@ namespace dynamix {
 		ByteBlock byte_code(lines);
 		if (!compiler.compile(&byte_code)) {
 			std::cerr << compiler.get_last_error();
-			return InterpretResult::CompileError;
+			return;
 		}
 
-		VirtualMachine vm;
 		if (vm.interpret(&byte_code) == InterpretResult::RuntimeError) {
 			const RuntimeError& error = vm.get_last_error();
 			std::cerr << std::format(
-				R"(thread 'main' panicked at: {}
-<{}:{}> Runtime Error: {}
-)",
+				"thread 'main' panicked at: {}\n<{}:{}> Runtime Error: {}",
 				error.source,
 				filepath,
 				error.line,
 				error.msg
 			);
-			return InterpretResult::RuntimeError;
+			return;
 		}
+	}
 
-		return InterpretResult::Ok;
+	static void run(const std::string& filepath, const std::string& source)
+	{
+		VirtualMachine vm;
+		run(vm, filepath, source);
 	}
 
 	static void run_file(const std::string& filepath)

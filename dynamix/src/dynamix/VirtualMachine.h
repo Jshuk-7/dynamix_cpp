@@ -2,6 +2,9 @@
 
 #include "ByteBlock.h"
 #include "Stack.h"
+#include "Value.h"
+
+#include <unordered_map>
 
 namespace dynamix {
 
@@ -34,14 +37,19 @@ namespace dynamix {
 		Value peek(int32_t distance = 0) const;
 		void reset_stack();
 		bool is_falsey(Value value) const;
-		void concatenate();
+		void concatenate(bool& failed);
+		void remove_null_terminator(std::string& str);
 		void runtime_error(const std::string& error);
 
 	private:
+		uint8_t* m_Ip = nullptr;
+		ByteBlock* m_Block = nullptr;
+		
 		Stack<Value> m_Stack;
 		Stack<Obj*> m_Objects;
-		ByteBlock* m_Block = nullptr;
-		uint8_t* m_Ip = nullptr;
+		
+		std::unordered_map<std::string, Value> m_Globals;
+
 		RuntimeError m_LastError;
 	};
 

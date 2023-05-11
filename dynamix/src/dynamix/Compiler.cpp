@@ -31,7 +31,7 @@ namespace dynamix {
 			{ TokenType::Gte,       ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
 			{ TokenType::Lt,        ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
 			{ TokenType::Lte,       ParseRule{ nullptr,            BIND_FN(binary), Precedence::Comparison } },
-			{ TokenType::Ident,     ParseRule{ nullptr,            nullptr,         Precedence::None } },
+			{ TokenType::Ident,     ParseRule{ BIND_FN(variable),  nullptr,         Precedence::None}},
 			{ TokenType::String,    ParseRule{ BIND_FN(string),    nullptr,         Precedence::None}},
 			{ TokenType::Number,    ParseRule{ BIND_FN(number),    nullptr,         Precedence::None } },
 			{ TokenType::Char,      ParseRule{ BIND_FN(character), nullptr,         Precedence::None } },
@@ -66,7 +66,7 @@ namespace dynamix {
 		}
 
 		consume(TokenType::Eof, "Expected end of expression");
-		emit_return();
+		push_return();
 
 #if DEBUG_PRINT_CODE
 		if (!m_Parser.had_error) {
@@ -113,23 +113,73 @@ namespace dynamix {
 	{
 		expression();
 		consume(TokenType::Semicolon, "Expected ';' after expression");
-		emit_byte((uint8_t)OpCode::Pop);
+		push_byte((uint8_t)OpCode::Pop);
 	}
 
 	void Compiler::print_statement()
 	{
 		expression();
 		consume(TokenType::Semicolon, "Expected ';' after expression");
-		emit_byte((uint8_t)OpCode::Print);
+		push_byte((uint8_t)OpCode::Print);
 	}
 
 	void Compiler::declaration()
 	{
-		if (match(TokenType::Print)) {
+		if (match(TokenType::Let)) {
+			let_declaration();
+		}
+		else if (match(TokenType::Print)) {
 			print_statement();
 		}
 		else {
 			expression_statement();
+		}
+
+		if (m_Parser.panic_mode) {
+			synchronize();
+		}
+	}
+
+	void Compiler::let_declaration()
+	{
+		uint8_t global = parse_variable("Expected identifier");
+
+		if (match(TokenType::Eq)) {
+			expression();
+		}
+		else {
+			push_byte((uint8_t)OpCode::Null);
+		}
+
+		consume(TokenType::Semicolon, "Expected ';' after expression");
+
+		define_variable(global);
+	}
+
+	void Compiler::synchronize()
+	{
+		m_Parser.panic_mode = false;
+
+		while (!check(TokenType::Eof)) {
+			if (m_Parser.previous.type == TokenType::Semicolon) {
+				return;
+			}
+
+			switch (m_Parser.current.type) {
+				case TokenType::Struct:
+				case TokenType::Fun:
+				case TokenType::Let:
+				case TokenType::For:
+				case TokenType::If:
+				case TokenType::While:
+				case TokenType::Print:
+				case TokenType::Return:
+					return;
+				default:
+					;
+			}
+
+			advance();
 		}
 	}
 
@@ -158,25 +208,25 @@ namespace dynamix {
 		return m_Parser.current.type == type;
 	}
 
-	void Compiler::emit_byte(uint8_t byte)
+	void Compiler::push_byte(uint8_t byte)
 	{
 		current_byte_block().write_byte(byte, m_Parser.previous.line);
 	}
 
-	void Compiler::emit_bytes(uint8_t one, uint8_t two)
+	void Compiler::push_bytes(uint8_t one, uint8_t two)
 	{
-		emit_byte(one);
-		emit_byte(two);
+		push_byte(one);
+		push_byte(two);
 	}
 
-	void Compiler::emit_constant(Value value)
+	void Compiler::push_constant(Value value)
 	{
-		emit_bytes((uint8_t)OpCode::Constant, make_constant(value));
+		push_bytes((uint8_t)OpCode::PushConstant, make_constant(value));
 	}
 
-	void Compiler::emit_return()
+	void Compiler::push_return()
 	{
-		emit_byte((uint8_t)OpCode::Return);
+		push_byte((uint8_t)OpCode::Return);
 	}
 
 	void Compiler::binary()
@@ -186,16 +236,16 @@ namespace dynamix {
 		parse_precedence((Precedence)((uint32_t)rule.precedence + 1));
 
 		switch (operator_type) {
-			case TokenType::BangEq: emit_bytes((uint8_t)OpCode::Equal, (uint8_t)OpCode::Not);   break;
-			case TokenType::EqEq:   emit_byte((uint8_t)OpCode::Equal);                          break;
-			case TokenType::Gt:     emit_byte((uint8_t)OpCode::Greater);                        break;
-			case TokenType::Gte:    emit_bytes((uint8_t)OpCode::Less, (uint8_t)OpCode::Not);    break;
-			case TokenType::Lt:     emit_byte((uint8_t)OpCode::Less);                           break;
-			case TokenType::Lte:    emit_bytes((uint8_t)OpCode::Greater, (uint8_t)OpCode::Not); break;
-			case TokenType::Plus:   emit_byte((uint8_t)OpCode::Add);                            break;
-			case TokenType::Minus:  emit_byte((uint8_t)OpCode::Sub);                            break;
-			case TokenType::Star:   emit_byte((uint8_t)OpCode::Mul);                            break;
-			case TokenType::Slash:  emit_byte((uint8_t)OpCode::Div);                            break;
+			case TokenType::BangEq: push_bytes((uint8_t)OpCode::Equal, (uint8_t)OpCode::Not);   break;
+			case TokenType::EqEq:   push_byte((uint8_t)OpCode::Equal);                          break;
+			case TokenType::Gt:     push_byte((uint8_t)OpCode::Greater);                        break;
+			case TokenType::Gte:    push_bytes((uint8_t)OpCode::Less, (uint8_t)OpCode::Not);    break;
+			case TokenType::Lt:     push_byte((uint8_t)OpCode::Less);                           break;
+			case TokenType::Lte:    push_bytes((uint8_t)OpCode::Greater, (uint8_t)OpCode::Not); break;
+			case TokenType::Plus:   push_byte((uint8_t)OpCode::Add);                            break;
+			case TokenType::Minus:  push_byte((uint8_t)OpCode::Sub);                            break;
+			case TokenType::Star:   push_byte((uint8_t)OpCode::Mul);                            break;
+			case TokenType::Slash:  push_byte((uint8_t)OpCode::Div);                            break;
 			default:
 				// unreachable
 				return;
@@ -205,9 +255,9 @@ namespace dynamix {
 	void Compiler::literal()
 	{
 		switch (m_Parser.previous.type) {
-			case TokenType::Null:  emit_byte((uint8_t)OpCode::Null);  break;
-			case TokenType::True:  emit_byte((uint8_t)OpCode::True);  break;
-			case TokenType::False: emit_byte((uint8_t)OpCode::False); break;
+			case TokenType::Null:  push_byte((uint8_t)OpCode::Null);  break;
+			case TokenType::True:  push_byte((uint8_t)OpCode::True);  break;
+			case TokenType::False: push_byte((uint8_t)OpCode::False); break;
 			default:
 				// unreachable
 				return;
@@ -220,6 +270,17 @@ namespace dynamix {
 		consume(TokenType::RParen, "Expected ')' after expression");
 	}
 
+	void Compiler::named_variable(Token* name)
+	{
+		uint8_t constant = identifier_constant(name);
+		push_bytes((uint8_t)OpCode::GetGlobal, constant);
+	}
+
+	void Compiler::variable()
+	{
+		named_variable(&m_Parser.previous);
+	}
+
 	void Compiler::string()
 	{
 		std::string string(m_Parser.previous.start + 1, m_Parser.previous.length - 2);
@@ -229,19 +290,19 @@ namespace dynamix {
 		((Obj*)object)->type = ObjType::String;
 		object->obj = string;
 
-		emit_constant(Value((Obj*)object));
+		push_constant(Value((Obj*)object));
 	}
 
 	void Compiler::number()
 	{
 		double number = strtod(m_Parser.previous.start, nullptr);
-		emit_constant(Value(number));
+		push_constant(Value(number));
 	}
 
 	void Compiler::character()
 	{
 		char character = m_Parser.previous.start[0];
-		emit_constant(Value(character));
+		push_constant(Value(character));
 	}
 
 	void Compiler::unary()
@@ -251,8 +312,8 @@ namespace dynamix {
 		parse_precedence(Precedence::Unary);
 
 		switch (operator_type) {
-			case TokenType::Minus: emit_byte((uint8_t)OpCode::Negate); break;
-			case TokenType::Bang:  emit_byte((uint8_t)OpCode::Not);    break;
+			case TokenType::Minus: push_byte((uint8_t)OpCode::Negate); break;
+			case TokenType::Bang:  push_byte((uint8_t)OpCode::Not);    break;
 			default:
 				// unreachable
 				return;
@@ -275,6 +336,29 @@ namespace dynamix {
 			ParseFn infix_rule = m_ParseRules.at(m_Parser.previous.type).infix;
 			infix_rule();
 		}
+	}
+
+	uint8_t Compiler::identifier_constant(Token* name)
+	{
+		ObjString* object = new ObjString();
+		((Obj*)object)->type = ObjType::String;
+
+		std::string identifier(name->start, name->length);
+
+		object->obj = identifier;
+
+		return make_constant(Value((Obj*)object));
+	}
+
+	uint8_t Compiler::parse_variable(const std::string& error)
+	{
+		consume(TokenType::Ident, error);
+		return identifier_constant(&m_Parser.previous);
+	}
+
+	void Compiler::define_variable(uint8_t global)
+	{
+		push_bytes((uint8_t)OpCode::DefineGlobal, global);
 	}
 
 	uint8_t Compiler::make_constant(Value value)

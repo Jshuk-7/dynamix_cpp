@@ -9,7 +9,8 @@ namespace dynamix {
 
 	enum class OpCode : uint8_t
 	{
-		Constant,
+		PushConstant,
+		Pop,
 		Null,
 		True,
 		False,
@@ -22,8 +23,10 @@ namespace dynamix {
 		Mul,
 		Negate,
 		Not,
+		DefineGlobal,
+		GetGlobal,
+		SetGlobal,
 		Print,
-		Pop,
 		Return,
 	};
 

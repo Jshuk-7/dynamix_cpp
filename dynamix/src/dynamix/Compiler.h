@@ -58,25 +58,34 @@ namespace dynamix {
 		void expression_statement();
 		void print_statement();
 		void declaration();
+		void let_declaration();
+
+		void synchronize();
 		
 		void consume(TokenType expected, const std::string& msg);
 		bool match(TokenType type);
 		bool check(TokenType type);
 
-		void emit_byte(uint8_t byte);
-		void emit_bytes(uint8_t one, uint8_t two);
-		void emit_constant(Value value);
-		void emit_return();
+		void push_byte(uint8_t byte);
+		void push_bytes(uint8_t one, uint8_t two);
+		void push_constant(Value value);
+		void push_return();
 		
 		void binary();
 		void literal();
 		void grouping();
+		void named_variable(Token* name);
+		void variable();
 		void string();
 		void number();
 		void character();
 		void unary();
-		void parse_precedence(Precedence precedence);
 		
+		void parse_precedence(Precedence precedence);
+		uint8_t identifier_constant(Token* name);
+		uint8_t parse_variable(const std::string& error);
+		void define_variable(uint8_t global);
+
 		uint8_t make_constant(Value value);
 
 		ByteBlock& current_byte_block();

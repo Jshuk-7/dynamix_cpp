@@ -83,7 +83,7 @@ namespace dynamix {
 #endif
 
 			switch (OpCode instruction = (OpCode)READ_BYTE()) {
-				case OpCode::Constant: {
+				case OpCode::PushConstant: {
 					Value constant = READ_CONSTANT();
 					if (constant.is_object()) {
 						m_Objects.push(constant.as.object);
@@ -91,6 +91,7 @@ namespace dynamix {
 
 					m_Stack.push(constant);
 				} break;
+				case OpCode::Pop: m_Stack.pop(); break;
 				case OpCode::Null: m_Stack.push(Value(nullptr)); break;
 				case OpCode::True: m_Stack.push(Value(true)); break;
 				case OpCode::False: m_Stack.push(Value(false)); break;
@@ -102,8 +103,18 @@ namespace dynamix {
 				case OpCode::Greater: BINARY_OP(>, '>'); break;
 				case OpCode::Less:    BINARY_OP(<, '<'); break;
 				case OpCode::Add: {
+					auto error = [&]() {
+						TYPE_MISMATCH(peek(1), peek(), '+');
+						return InterpretResult::RuntimeError;
+					};
+
 					if (peek(1).is_string()) {
-						concatenate();
+						bool failed = false;
+						concatenate(failed);
+
+						if (failed) {
+							return error();
+						}
 					}
 					else if (peek(1).is(ValueType::Number) && peek().is(ValueType::Number)) {
 						double b = m_Stack.pop().data().as.number;
@@ -111,8 +122,7 @@ namespace dynamix {
 						m_Stack.push(Value(a + b));
 					}
 					else {
-						TYPE_MISMATCH(peek(1), peek(), '+');
-						return InterpretResult::RuntimeError;
+						return error();
 					}
 				} break;
 				case OpCode::Sub:     BINARY_OP(-, '-'); break;
@@ -127,9 +137,29 @@ namespace dynamix {
 					m_Stack.push(Value(-m_Stack.pop().data().as.number));
 				} break;
 				case OpCode::Not: m_Stack.push(Value(is_falsey(m_Stack.pop().data()))); break;
+				case OpCode::DefineGlobal: {
+					ObjString* name = READ_CONSTANT().as_string();
+					m_Globals[name->obj] = peek();
+					m_Stack.pop();
+				} break;
+				case OpCode::GetGlobal: {
+					ObjString* name = READ_CONSTANT().as_string();
+					if (!m_Globals.contains(name->obj)) {
+						std::string err = std::format("Undefined variable '{}'", name->obj);
+						runtime_error(err);
+						return InterpretResult::RuntimeError;
+					}
+
+					Value value = m_Globals[name->obj];
+					m_Stack.push(value);
+				} break;
+				case OpCode::SetGlobal: {
+					
+				} break;
 				case OpCode::Print: m_Stack.pop().data().print(true); break;
-				case OpCode::Pop: m_Stack.pop(); break;
 				case OpCode::Return: return InterpretResult::Ok;
+				default:
+					runtime_error("OpCode not implemented in virtual machine");
 			}
 		}
 
@@ -174,44 +204,60 @@ namespace dynamix {
 		return false;
 	}
 
-	void VirtualMachine::concatenate()
+	void VirtualMachine::concatenate(bool& failed)
 	{
 		ObjString* result = new ObjString();
 		((Obj*)result)->type = ObjType::String;
 
 		if (peek().is_string()) {
-			ObjString* b = m_Stack.pop().data().as_string();
-			ObjString* a = m_Stack.pop().data().as_string();
+			ObjString* rhs = m_Stack.pop().data().as_string();
+			ObjString* lhs = m_Stack.pop().data().as_string();
 
-			std::string string = a->obj;
-			string += b->obj;
+			std::string string = lhs->obj;
+			remove_null_terminator(string);
+			std::string res = string + rhs->obj + '\0';
 
-			result->obj = string;
+			result->obj = res;
 		}
 		else if (peek().is(ValueType::Character)) {
-			char c = m_Stack.pop().data().as.character;
+			char rhs = m_Stack.pop().data().as.character;
 			ObjString* lhs = m_Stack.pop().data().as_string();
 
 			std::string string = lhs->obj;
-			string += c + '\0';
+			remove_null_terminator(string);
+			std::string res = string + rhs + '\0';
 
-			result->obj = string;
+			result->obj = res;
 		}
 		else if (peek().is(ValueType::Number)) {
-			double n = m_Stack.pop().data().as.number;
+			double rhs = m_Stack.pop().data().as.number;
 			ObjString* lhs = m_Stack.pop().data().as_string();
 
 			std::string string = lhs->obj;
-			string.pop_back();
+			remove_null_terminator(string);
 			std::stringstream ss;
-			ss << string << std::setw(1) << n << '\0';
-			string = ss.str();
+			ss << string << std::setw(1) << rhs << '\0';
+			std::string res = ss.str();
 
-			result->obj = string;
+			result->obj = res;
+		}
+		else {
+			failed = true;
 		}
 
 		m_Objects.push((Obj*)result);
 		m_Stack.push(Value((Obj*)result));
+	}
+
+	void VirtualMachine::remove_null_terminator(std::string& str)
+	{
+		while (size_t pos = str.find('\0')) {
+			if (pos == std::string::npos) {
+				return;
+			}
+
+			str.erase(pos);
+		}
 	}
 
 	void VirtualMachine::runtime_error(const std::string& error)

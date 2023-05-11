@@ -50,6 +50,11 @@ namespace dynamix {
 			Obj* object;
 		} as;
 
+		Value() {
+			type = ValueType::Null;
+			as.number = 0.0;
+		}
+
 		Value(double number) {
 			type = ValueType::Number;
 			as.number = number;
