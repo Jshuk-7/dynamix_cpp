@@ -1,6 +1,7 @@
 #include "Compiler.h"
 
 #include "dynamix.h"
+#include "Object.h"
 #include "Disassembler.h"
 
 #include <format>
@@ -59,13 +60,27 @@ namespace dynamix {
 		}
 	)
 	{
+		m_Function = nullptr;
+		m_Type = FunctionType::Script;
+
 		m_Locals.reserve(LOCAL_CAPACITY);
 		m_ScopeDepth = 0;
+
+		m_Function = new ObjFunction();
+		m_Function->arity = 0;
+		m_Function->block = ByteBlock();
+		m_Function->name = "";
+		((Obj*)m_Function)->type = ObjType::Function;
+
+		Local local;
+		local.depth = 0;
+		local.name.start = "";
+		local.name.length = 0;
+		m_Locals.push(local);
 	}
 
-	bool Compiler::compile(ByteBlock* byte_code)
+	ObjFunction* Compiler::compile()
 	{
-		m_ByteBlock = byte_code;
 		advance();
 		
 		while (!match(TokenType::Eof)) {
@@ -78,11 +93,11 @@ namespace dynamix {
 #if DEBUG_DISASSEMBLE_CODE
 		if (!m_Parser.had_error) {
 			ByteBlock block = current_byte_block();
-			Disassembler::disassemble_block(&block, "code");
+			Disassembler::disassemble_block(&block, (m_Function->name.empty() ? "<script>" : m_Function->name.c_str()));
 		}
 #endif
 
-		return !m_Parser.had_error;
+		return m_Parser.had_error ? nullptr : m_Function;
 	}
 
 	const std::string& Compiler::get_last_error() const
@@ -712,7 +727,7 @@ namespace dynamix {
 
 	ByteBlock& Compiler::current_byte_block()
 	{
-		return *m_ByteBlock;
+		return m_Function->block;
 	}
 
 	void Compiler::error(const std::string& msg)

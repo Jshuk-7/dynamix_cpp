@@ -43,6 +43,7 @@ namespace dynamix {
 		std::vector<uint32_t> lines;
 		std::vector<std::string> source_lines;
 
+		ByteBlock() = default;
 		ByteBlock(const std::vector<std::string>& source_lines);
 
 		void write_byte(uint8_t byte, uint32_t line);

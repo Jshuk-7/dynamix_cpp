@@ -1,9 +1,6 @@
 #pragma once
 
-#include "ByteBlock.h"
-#include "Disassembler.h"
 #include "VirtualMachine.h"
-#include "Compiler.h"
 
 #include <iostream>
 #include <fstream>
@@ -17,7 +14,6 @@ namespace dynamix {
 
 	static void repl();
 	static InterpretResult run(const std::string& filepath, const std::string& source);
-	static InterpretResult run(VirtualMachine& vm, const std::string& filepath, const std::string& source);
 	static InterpretResult run_file(const std::string& filepath);
 
 	static bool is_repl_mode = false;
@@ -46,47 +42,14 @@ namespace dynamix {
 			printf(">> ");
 			std::string line;
 			std::getline(std::cin, line);
-			run(vm, "stdin", line);
+			vm.run_code("stdin", line);
 		}
-	}
-
-	static InterpretResult run(VirtualMachine& vm, const std::string& filepath, const std::string& source)
-	{
-		Compiler compiler(filepath, source);
-		
-		std::string line;
-		std::vector<std::string> lines;
-		std::stringstream ss(source);
-		while (std::getline(ss, line, '\n'))
-			lines.push_back(line);
-
-		ByteBlock byte_code(lines);
-		if (!compiler.compile(&byte_code)) {
-			std::cerr << (!is_repl_mode ? std::format("failed to compile program '{}'\n", filepath) : "")
-				<< compiler.get_last_error();
-
-			return InterpretResult::CompileError;
-		}
-
-		if (vm.interpret(&byte_code) == InterpretResult::RuntimeError) {
-			const RuntimeError& error = vm.get_last_error();
-			std::cerr << std::format(
-				"thread 'main' panicked at: {}\n<{}:{}> Runtime Error: {}\n",
-				error.source,
-				filepath,
-				error.line,
-				error.msg
-			);
-			return InterpretResult::RuntimeError;
-		}
-
-		return InterpretResult::Ok;
 	}
 
 	static InterpretResult run(const std::string& filepath, const std::string& source)
 	{
 		VirtualMachine vm;
-		return run(vm, filepath, source);
+		return vm.run_code(filepath, source);
 	}
 
 	static InterpretResult run_file(const std::string& filepath)

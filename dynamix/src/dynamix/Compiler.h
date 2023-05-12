@@ -41,6 +41,12 @@ namespace dynamix {
 		int32_t depth;
 	};
 
+	enum class FunctionType
+	{
+		Function,
+		Script,
+	};
+
 	struct Parser
 	{
 		Token previous;
@@ -54,7 +60,7 @@ namespace dynamix {
 	public:
 		Compiler(const std::string& filepath, const std::string& source);
 
-		bool compile(ByteBlock* byte_code);
+		ObjFunction* compile();
 
 		const std::string& get_last_error() const;
 
@@ -121,10 +127,11 @@ namespace dynamix {
 		void error_at_current(const std::string& msg);
 
 	private:
+		ObjFunction* m_Function = nullptr;
+		FunctionType m_Type;
 		std::string m_Filename;
 		std::string m_LastError;
 		
-		ByteBlock* m_ByteBlock = nullptr;
 		Lexer m_Lexer;
 		Parser m_Parser;
 

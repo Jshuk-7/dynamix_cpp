@@ -1,6 +1,9 @@
 #include "VirtualMachine.h"
 
 #include "dynamix.h"
+#include "Value.h"
+#include "Object.h"
+#include "Compiler.h"
 #include "Disassembler.h"
 
 #include <sstream>
@@ -8,12 +11,14 @@
 
 namespace dynamix {
 
-#define STACK_CAPACITY 256
+#define CALL_FRAME_CAPACITY 64
+#define STACK_CAPACITY (CALL_FRAME_CAPACITY * UINT8_MAX + 1)
 #define OBJECT_CAPACITY 256
 
 	VirtualMachine::VirtualMachine()
 	{
 		m_Stack.reserve(STACK_CAPACITY);
+		m_Frames.reserve(CALL_FRAME_CAPACITY);
 		m_Objects.reserve(OBJECT_CAPACITY);
 	}
 
@@ -31,24 +36,54 @@ namespace dynamix {
 		}
 	}
 
-	InterpretResult VirtualMachine::interpret(ByteBlock* block)
+	InterpretResult VirtualMachine::run_code(const std::string& filepath, const std::string& source)
 	{
-		m_Block = block;
-		m_Ip = m_Block->bytes.data();
+		Compiler compiler(filepath, source);
 
-		return run();
+		ObjFunction* function = compiler.compile();
+		if (!function) {
+			std::cerr << (!is_repl_mode ? std::format("failed to compile program '{}'\n", filepath) : "")
+				<< compiler.get_last_error();
+
+			return InterpretResult::CompileError;
+		}
+
+		m_Stack.push(Value(function));
+
+		CallFrame frame;
+		frame.function = function;
+		frame.ip = function->block.bytes.data();
+		frame.slots = &m_Stack[0];
+		m_Frames.push(frame);
+
+		if (interpret() == InterpretResult::RuntimeError) {
+			std::cerr << std::format(
+				"thread 'main' panicked at: '{}'\n<{}:{}:{}> Runtime Error: {}\n",
+				m_LastError.source,
+				filepath,
+				m_LastError.line,
+				m_LastError.function_name,
+				m_LastError.msg
+			);
+
+			return InterpretResult::RuntimeError;
+		}
+
+		return InterpretResult::Ok;
 	}
 
-	InterpretResult VirtualMachine::run()
+	InterpretResult VirtualMachine::interpret()
 	{
-#define READ_BYTE() (*m_Ip++)
-#define READ_SHORT() (m_Ip += 2, (uint16_t)((m_Ip[-2] << 8) | m_Ip[-1]))
-#define READ_CONSTANT() (m_Block->constants[READ_BYTE()])
+		CallFrame* frame = &m_Frames[m_Frames.size() - 1];
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() (frame->function->block.constants[READ_BYTE()])
 #define READ_STRING() (READ_CONSTANT().as_string())
 #define TYPE_MISMATCH(lhs, rhs, op)\
 			auto lhs_type = value_type_to_string(lhs.type, lhs.is_object() ? &lhs.as.object->type : nullptr);\
 			auto rhs_type = value_type_to_string(rhs.type, rhs.is_object() ? &rhs.as.object->type : nullptr);\
-			runtime_error(std::format("operator '{}' not defined for types '{}' and '{}'", op, lhs_type, rhs_type))
+			runtime_error(std::format("operator '{}' not defined for types '{}' and '{}'", op, lhs_type, rhs_type), frame)
 #define BINARY_OP(op, op_char)\
 			do {\
 				if (peek(1).type != peek().type) {\
@@ -68,11 +103,23 @@ namespace dynamix {
 			} while (false)
 
 #if DEBUG_STACK_TRACE
-		printf("-- stack trace --");
+		printf("-- stack trace --\n");
 #endif
 		for (;;) {
 #if DEBUG_STACK_TRACE
-			stack_trace();
+			printf("          ");
+			for (size_t i = 0; i < m_Stack.size(); i++) {
+				const Value& slot = m_Stack[i];
+				printf("[ ");
+				slot.print(false);
+				printf(" ]");
+			}
+			printf("\n");
+
+			Disassembler::disassemble_instruction(
+				&frame->function->block,
+				(int32_t)(frame->ip - frame->function->block.bytes.data())
+			);
 #endif
 
 			switch (OpCode instruction = (OpCode)READ_BYTE()) {
@@ -123,7 +170,7 @@ namespace dynamix {
 				case OpCode::Div:     BINARY_OP(/, '/'); break;
 				case OpCode::Negate: {
 					if (!peek(0).is(ValueType::Number)) {
-						runtime_error("operand must be a number");
+						runtime_error("operand must be a number", frame);
 						return InterpretResult::RuntimeError;
 					}
 
@@ -132,18 +179,18 @@ namespace dynamix {
 				case OpCode::Not: m_Stack.push(Value(is_falsey(m_Stack.pop().data()))); break;
 				case OpCode::Jmp: {
 					uint16_t offset = READ_SHORT();
-					m_Ip += offset;
-				} break;
-				case OpCode::Loop: {
-					uint16_t offset = READ_SHORT();
-					m_Ip -= offset;
+					frame->ip += offset;
 				} break;
 				case OpCode::Jz: {
 					uint16_t offset = READ_SHORT();
 
 					if (is_falsey(peek())) {
-						m_Ip += offset;
+						frame->ip += offset;
 					}
+				} break;
+				case OpCode::Loop: {
+					uint16_t offset = READ_SHORT();
+					frame->ip -= offset;
 				} break;
 				case OpCode::DefineGlobal: {
 					ObjString* name = READ_STRING();
@@ -151,7 +198,7 @@ namespace dynamix {
 						runtime_error(std::format(
 							"global variable '{}' has multiple definitions; multiple initialization",
 							name->obj
-						));
+						), frame);
 						return InterpretResult::RuntimeError;
 					}
 
@@ -162,7 +209,7 @@ namespace dynamix {
 					ObjString* name = READ_STRING();
 					if (!m_Globals.contains(name->obj)) {
 						std::string err = std::format("undefined variable '{}'", name->obj);
-						runtime_error(err);
+						runtime_error(err, frame);
 						return InterpretResult::RuntimeError;
 					}
 
@@ -173,7 +220,7 @@ namespace dynamix {
 					ObjString* name = READ_STRING();
 					if (!m_Globals.contains(name->obj)) {
 						std::string err = std::format("undefined variable '{}'", name->obj);
-						runtime_error(err);
+						runtime_error(err, frame);
 						return InterpretResult::RuntimeError;
 					}
 
@@ -181,20 +228,20 @@ namespace dynamix {
 				} break;
 				case OpCode::GetLocal: {
 					uint8_t slot = READ_BYTE();
-					m_Stack.push(m_Stack[(size_t)slot]);
+					m_Stack.push(frame->slots[slot]);
 				} break;
 				case OpCode::SetLocal: {
 					uint8_t slot = READ_BYTE();
-					m_Stack[slot] = peek();
+					frame->slots[slot] = peek();
 				} break;
 				case OpCode::Print: m_Stack.pop().data().print(true); break;
 				case OpCode::Return: return InterpretResult::Ok;
 				default: {
-					size_t opcode = m_Ip - m_Block->bytes.data() - 1;
+					size_t opcode = frame->ip - frame->function->block.bytes.data() - 1;
 					runtime_error(std::format(
 						"OpCode '{}' not implemented in virtual machine",
 						opcode
-					));
+					), frame);
 					return InterpretResult::RuntimeError;
 				}
 			}
@@ -208,11 +255,6 @@ namespace dynamix {
 #undef READ_BYTE
 	}
 
-	const RuntimeError& VirtualMachine::get_last_error() const
-	{
-		return m_LastError;
-	}
-
 	Value VirtualMachine::peek(int32_t distance) const
 	{
 		return m_Stack[m_Stack.size() - 1 - distance];
@@ -221,6 +263,7 @@ namespace dynamix {
 	void VirtualMachine::reset_stack()
 	{
 		m_Stack.clear();
+		m_Frames.clear();
 	}
 
 	bool VirtualMachine::is_falsey(Value value) const
@@ -300,29 +343,21 @@ namespace dynamix {
 		}
 	}
 
-	void VirtualMachine::stack_trace()
+	void VirtualMachine::runtime_error(const std::string& error, const CallFrame* frame)
 	{
-		printf("          ");
-		
-		for (size_t i = 0; i < m_Stack.size(); i++) {
-			const Value& slot = m_Stack[i];
-			printf("[ ");
-			slot.print(false);
-			printf(" ]");
+		size_t instruction = frame->ip - frame->function->block.bytes.data() - 1;
+		uint32_t line = frame->function->block.lines[instruction];
+		//std::string source = m_Block->source_lines[line - 1];
+		std::string function_name;
+
+		if (frame->function->name.empty()) {
+			function_name = "<script>";
+		}
+		else {
+			function_name = frame->function->name;
 		}
 
-		printf("\n");
-
-		Disassembler::disassemble_instruction(m_Block, (int32_t)(m_Ip - m_Block->bytes.data()));
-	}
-
-	void VirtualMachine::runtime_error(const std::string& error)
-	{
-		size_t instruction = m_Ip - m_Block->bytes.data() - 1;
-		uint32_t line = m_Block->lines[instruction];
-		std::string source = m_Block->source_lines[line - 1];
-
-		m_LastError = RuntimeError{ error, source, line };
+		m_LastError = RuntimeError{ error, "", function_name, line };
 		reset_stack();
 	}
 

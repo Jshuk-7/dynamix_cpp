@@ -133,6 +133,7 @@
     <ClCompile Include="src\dynamix\Disassembler.cpp" />
     <ClCompile Include="src\dynamix\ByteBlock.cpp" />
     <ClCompile Include="src\dynamix\Lexer.cpp" />
+    <ClCompile Include="src\dynamix\Value.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\dynamix\VirtualMachine.cpp" />
   </ItemGroup>
