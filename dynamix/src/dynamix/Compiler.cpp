@@ -140,6 +140,49 @@ namespace dynamix {
 		consume(TokenType::RBracket, "expected '}' after block");
 	}
 
+	void Compiler::function(FunctionType type)
+	{
+		begin_scope();
+
+		ObjFunction* fun = new ObjFunction();
+		fun->arity = 0;
+		fun->block = ByteBlock();
+		fun->name = "";
+
+		if (type != FunctionType::Script) {
+			std::string fun_name(m_Parser.previous.start, m_Parser.previous.length);
+			fun_name.push_back('\0');
+			fun->name = fun_name;
+		}
+
+		consume(TokenType::LParen, "expected '(' after identifier");
+		if (!check(TokenType::RParen)) {
+			do {
+				fun->arity++;
+				if (fun->arity > 255) {
+					error_at_current("cannot have more than 255 parameters");
+				}
+				uint8_t constant = parse_variable("expected variable name");
+				define_variable(constant);
+			} while (match(TokenType::Comma));
+		}
+
+		consume(TokenType::RParen, "expected ')' after parameter list");
+
+		if (match(TokenType::LBracket)) {
+			block();
+		}
+		else {
+			statement();
+		}
+
+		((Obj*)fun)->type = ObjType::Function;
+
+		push_bytes((uint8_t)OpCode::PushConstant, make_constant(Value((Obj*)fun)));
+
+		end_scope();
+	}
+
 	void Compiler::statement()
 	{
 		if (match(TokenType::Print)) {
@@ -289,7 +332,10 @@ namespace dynamix {
 
 	void Compiler::declaration()
 	{
-		if (match(TokenType::Let)) {
+		if (match(TokenType::Fun)) {
+			fun_declaration();
+		}
+		else if (match(TokenType::Let)) {
 			let_declaration();
 		}
 		else {
@@ -314,6 +360,14 @@ namespace dynamix {
 
 		consume(TokenType::Semicolon, "expected ';' after expression");
 
+		define_variable(global);
+	}
+
+	void Compiler::fun_declaration()
+	{
+		uint8_t global = parse_variable("expected function name");
+		mark_initialized();
+		function(FunctionType::Function);
 		define_variable(global);
 	}
 
@@ -690,6 +744,10 @@ namespace dynamix {
 
 	void Compiler::mark_initialized()
 	{
+		if (m_ScopeDepth == 0) {
+			return;
+		}
+
 		m_Locals[m_Locals.size() - 1].depth = m_ScopeDepth;
 	}
 

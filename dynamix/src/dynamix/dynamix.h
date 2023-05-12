@@ -10,7 +10,7 @@
 namespace dynamix {
 
 #define DEBUG_STACK_TRACE 0
-#define DEBUG_DISASSEMBLE_CODE 0
+#define DEBUG_DISASSEMBLE_CODE 1
 
 	static void repl();
 	static InterpretResult run(const std::string& filepath, const std::string& source);

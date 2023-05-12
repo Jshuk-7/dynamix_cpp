@@ -69,6 +69,7 @@ namespace dynamix {
 		
 		void expression();
 		void block();
+		void function(FunctionType type);
 		void statement();
 		void expression_statement();
 		void print_statement();
@@ -77,6 +78,7 @@ namespace dynamix {
 		void for_statement();
 		void declaration();
 		void let_declaration();
+		void fun_declaration();
 
 		void synchronize();
 		
